@@ -53,10 +53,34 @@ async function connect() {
   return client;
 }
 
+/**
+ * Removes every trace of the e2e accounts, evaluations first.
+ *
+ * `evaluations.judgeId` restricts deletion, so a judge who has been assigned anything
+ * cannot be removed from the database while those rows exist. That is the right rule —
+ * scores must not vanish because someone deleted a judge — and the application never
+ * hard-deletes anyone anyway; admin removal is a soft delete. It only matters here,
+ * where the fixture really does want the rows gone.
+ */
+async function purgeE2EData(db: Client) {
+  await db.query(
+    `DELETE FROM evaluations
+     WHERE "judgeId" IN (SELECT id FROM users WHERE email LIKE $1)
+        OR "attemptId" IN (
+             SELECT a.id FROM attempts a
+             JOIN users u ON u.id = a."participantId"
+             WHERE u.email LIKE $1
+           )`,
+    [`${E2E_PREFIX}%`],
+  );
+
+  await db.query(`DELETE FROM users WHERE email LIKE $1`, [`${E2E_PREFIX}%`]);
+}
+
 export async function seedAccounts() {
   const db = await connect();
   try {
-    await db.query(`DELETE FROM users WHERE email LIKE $1`, [`${E2E_PREFIX}%`]);
+    await purgeE2EData(db);
 
     // The suite logs in far more often than a person would, and the per-account limit
     // is deliberately tight (10 per 5 minutes). Clearing the counters keeps the tests
@@ -258,6 +282,84 @@ export async function challenge3Row(email: string) {
   }
 }
 
+/**
+ * A complete, sealed submission — all three challenges, plus an evaluation assigned to
+ * the e2e judge.
+ *
+ * Built directly in the database rather than by driving a participant through a
+ * three-hour attempt: the review screens need submissions to exist, and how they came
+ * to exist is already covered by submit.spec.
+ */
+export async function seedSubmission(
+  email: string,
+  opts: { score?: number; reviewed?: boolean } = {},
+) {
+  const db = await connect();
+  try {
+    const attemptId = randomUUID();
+
+    const user = await db.query<{ id: string }>(`SELECT id FROM users WHERE email = $1`, [email]);
+    const participantId = user.rows[0]?.id;
+    if (!participantId) throw new Error(`No such participant: ${email}`);
+
+    await db.query(
+      `DELETE FROM attempts WHERE "participantId" = $1`,
+      [participantId],
+    );
+
+    await db.query(
+      `INSERT INTO attempts (id, "participantId", "startedAt", "endsAt", "durationMinutes",
+                             state, "submittedAt", "autoSubmitted", "updatedAt")
+       VALUES ($1, $2, NOW() - interval '3 hours', NOW(), 180, 'SUBMITTED', NOW(), false, NOW())`,
+      [attemptId, participantId],
+    );
+
+    await db.query(
+      `INSERT INTO challenge1_items (id, "attemptId", kind, title, description, position, "updatedAt")
+       VALUES ($1, $2, 'BUG_REPORT', 'Checkout accepts a negative quantity',
+               'Steps:' || chr(10) || '1. Add an item' || chr(10) || '2. Set quantity to -1', 0, NOW()),
+              ($3, $2, 'TEST_CASE', 'Quantity field rejects values below one',
+               'Precondition: an item is in the basket.', 0, NOW())`,
+      [randomUUID(), attemptId, randomUUID()],
+    );
+
+    await db.query(
+      `INSERT INTO challenge2_submissions ("attemptId", "fileKey", "originalFilename",
+                                           "sizeBytes", "contentType", "uploadedAt")
+       VALUES ($1, $2, 'chatbot-evaluation.pdf', 12345, 'application/pdf', NOW())`,
+      [attemptId, `challenge2/${attemptId}/${randomUUID()}.pdf`],
+    );
+
+    await db.query(
+      `INSERT INTO challenge3_submissions ("attemptId", "githubUrl", "verifiedPublic", "savedAt")
+       VALUES ($1, 'https://github.com/e2e/storeTask-wtq26', true, NOW())`,
+      [attemptId],
+    );
+
+    const judge = await db.query<{ id: string }>(`SELECT id FROM users WHERE email = $1`, [
+      ACCOUNTS.judge.email,
+    ]);
+
+    await db.query(
+      `INSERT INTO evaluations (id, "attemptId", "judgeId", "assignedAt", status,
+                                "totalScore", "submittedAt")
+       VALUES ($1, $2, $3, NOW(), $4, $5, $6)`,
+      [
+        randomUUID(),
+        attemptId,
+        judge.rows[0].id,
+        opts.reviewed ? "SUBMITTED" : "ASSIGNED",
+        opts.score ?? null,
+        opts.reviewed ? new Date() : null,
+      ],
+    );
+
+    return attemptId;
+  } finally {
+    await db.end();
+  }
+}
+
 export async function attemptRow(email: string) {
   const db = await connect();
   try {
@@ -296,8 +398,8 @@ export async function userStatus(email: string): Promise<string | null> {
 export async function evaluationRows(email: string) {
   const db = await connect();
   try {
-    const result = await db.query<{ id: string; judgeId: string; status: string }>(
-      `SELECT e.id, e."judgeId", e.status
+    const result = await db.query<{ id: string; judgeId: string; status: string; attemptId: string }>(
+      `SELECT e.id, e."judgeId", e.status, e."attemptId"
        FROM evaluations e
        JOIN attempts a ON a.id = e."attemptId"
        JOIN users u ON u.id = a."participantId"
@@ -317,7 +419,7 @@ export async function evaluationRow(email: string) {
 export async function cleanupAccounts() {
   const db = await connect();
   try {
-    await db.query(`DELETE FROM users WHERE email LIKE $1`, [`${E2E_PREFIX}%`]);
+    await purgeE2EData(db);
   } finally {
     await db.end();
   }
