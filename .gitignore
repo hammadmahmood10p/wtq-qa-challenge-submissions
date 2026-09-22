@@ -53,3 +53,6 @@ next-env.d.ts
 /test-results
 /playwright-report
 /blob-report
+
+# demo credentials — written in plain text, never committed
+/docs/DEMO_ACCOUNTS.md
