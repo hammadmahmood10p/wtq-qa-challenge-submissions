@@ -11,6 +11,16 @@ const nextConfig: NextConfig = {
   // Server-only packages that must not be traced into the client bundle.
   serverExternalPackages: ["@node-rs/argon2"],
 
+  experimental: {
+    // Server Actions accept 1MB by default, which silently rejects every Challenge 2
+    // report. MAX_UPLOAD_MB is 20; the extra allows for multipart overhead.
+    //
+    // A raised limit is a denial-of-service surface, so the real cap stays on the
+    // server (validatePdf) and the concurrency behaviour of large uploads is a Day 12
+    // load-test question — see T2 in docs/PENDING.md.
+    serverActions: { bodySizeLimit: "25mb" },
+  },
+
   poweredByHeader: false,
 
   async headers() {

@@ -1,0 +1,57 @@
+# Pending items
+
+Everything the build is waiting on, and everything deferred until after the event.
+Reviewed at the Day 12 freeze; nothing here should reach 10 October unresolved unless
+it is marked *post-event*.
+
+**Last updated:** Day 7
+
+---
+
+## 1. Blocked on information from the organisers
+
+| # | Needed | Where it plugs in | Consequence if it arrives late |
+|---|---|---|---|
+| **P1** | **Application-under-test link** (Challenge 1) | `APPLICATION_UNDER_TEST_URL` in `src/lib/challenge-content.ts` | One constant. The briefing and the Challenge 1 page already show a "link pending" notice instead, so nothing breaks — but Challenge 1 is unusable without it on the day. Also needs to survive 1000 concurrent users, which is not our infrastructure |
+| **P2** | **Challenge 3 CSV** (~20 short test cases) | `CHALLENGE3_CSV_URL` in the same file | One constant plus a download link on the Challenge 3 page |
+| **P3** | **Deployment target** from 10Pearls IT | Environment variables only — the app is host-agnostic by design (§2.1) | Gates the load test and the dress rehearsal, which are worthless run anywhere other than where the event runs. Also gates P4 |
+| **P4** | **Database region**, once P3 is known | Recreate the Neon project in the matching region | Currently us-east-2 (Ohio), ~205–280ms per query from Pakistan. Two minutes now, painful once participants have registered. See R1b |
+| **P5** | **Score scale** per challenge, and the +5 Challenge 2 bonus | `app_settings` rows, already seeded at 0 | Needed by Day 10, when judging is built. Configuration, not code — can be set the day before |
+| **P6** | **Judging model** — how many judges, and whether every submission gets a full review or only a shortlist | Assignment logic on Day 8 | An event-design decision. ~1000 submissions reviewed in one afternoon may not be physically possible; see §3.4 |
+| **P7** | **Branding** — is the Aurora palette approved? | `src/app/globals.css`, visible at `/design-preview` | Cheap to change now, expensive after the Day 11 polish pass |
+
+---
+
+## 2. Decisions still open
+
+| # | Question | Default if unanswered |
+|---|---|---|
+| **Q6** | Laptops only, or must the challenge work on mobile? | Built for laptop; responsive down to tablet |
+| **Q12** | Do participants see their scores after the event? | No. Accounts lock on submission; a read-only results mode would need to be added |
+| **Q13** | Mask the CNIC from judges (`42101*****678`)? | `maskCnic()` exists and is unused. Currently judges would see it in full, per the brief |
+| **D8 numbers** | Caps of 50 bug reports, 50 test cases, 200-character titles, 5000-character descriptions | As listed. Generous enough that nobody writing in good faith meets them |
+| **Tabs** | The brief says clicking a challenge tab opens its submission page in a new browser tab. Taken literally that navigates away from the workspace and takes the clock with it | Tab shows the details; an explicit link opens the submission page in a new tab |
+
+---
+
+## 3. Known technical debt
+
+| # | Item | Why it is deferred |
+|---|---|---|
+| **T1** | `middleware.ts` uses a convention Next 16 deprecates in favour of `proxy` | Works, warns on dev start. A framework convention change is not worth the risk this close to the event |
+| **T2** | Server action body limit raised to 25MB for Challenge 2 uploads | Fine functionally; the concurrency behaviour of large uploads is a Day 12 load-test question, not a correctness one |
+| **T3** | GitHub reachability check is best-effort and unauthenticated | Rate limits and outages must never cost a participant their submission, so it warns rather than blocks |
+| **T4** | No offline retry queue for autosave yet | Day 8. Saves currently surface an error and can be retried with the entry's own save button |
+
+---
+
+## 4. Deferred past the event
+
+Not needed to run 10 October or to pick a winner:
+
+- CSV/XLSX score export — a sorted results table is enough on the day
+- Analytics dashboard and charts
+- Audit **log viewer UI** — rows are written throughout; query directly if needed
+- Bulk participant import — add it when the registration list exists
+- Judge email verification — unnecessary, the super admin approves every judge
+- Scoring rubric — free-form numeric scores with server-side max validation

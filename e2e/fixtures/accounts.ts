@@ -209,6 +209,48 @@ export async function challenge1Titles(email: string): Promise<string[]> {
   }
 }
 
+/** Challenge 2's stored row, read straight from the database. */
+export async function challenge2Row(email: string) {
+  const db = await connect();
+  try {
+    const result = await db.query<{
+      attemptId: string;
+      fileKey: string;
+      originalFilename: string;
+      sizeBytes: number;
+      contentType: string;
+    }>(
+      `SELECT c."attemptId", c."fileKey", c."originalFilename", c."sizeBytes", c."contentType"
+       FROM challenge2_submissions c
+       JOIN attempts a ON a.id = c."attemptId"
+       JOIN users u ON u.id = a."participantId"
+       WHERE u.email = $1`,
+      [email],
+    );
+    return result.rows[0] ?? null;
+  } finally {
+    await db.end();
+  }
+}
+
+/** Challenge 3's stored row. */
+export async function challenge3Row(email: string) {
+  const db = await connect();
+  try {
+    const result = await db.query<{ githubUrl: string; verifiedPublic: boolean | null }>(
+      `SELECT c."githubUrl", c."verifiedPublic"
+       FROM challenge3_submissions c
+       JOIN attempts a ON a.id = c."attemptId"
+       JOIN users u ON u.id = a."participantId"
+       WHERE u.email = $1`,
+      [email],
+    );
+    return result.rows[0] ?? null;
+  } finally {
+    await db.end();
+  }
+}
+
 export async function cleanupAccounts() {
   const db = await connect();
   try {
