@@ -14,6 +14,7 @@ interface Props {
   value: string;
   onChange: (value: string) => void;
   invalid?: boolean;
+  required?: boolean;
   describedBy?: string;
   legend: string;
 }
@@ -31,11 +32,16 @@ export function RadioCards({
   value,
   onChange,
   invalid,
+  required,
   describedBy,
   legend,
 }: Props) {
   return (
-    <fieldset aria-describedby={describedBy} aria-invalid={invalid || undefined}>
+    <fieldset
+      aria-describedby={describedBy}
+      aria-invalid={invalid || undefined}
+      aria-required={required || undefined}
+    >
       <legend className="sr-only">{legend}</legend>
       <div className="grid gap-2 sm:grid-cols-3">
         {options.map((option) => {

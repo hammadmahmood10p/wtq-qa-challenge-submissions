@@ -40,13 +40,14 @@ export function ParticipantForm() {
         error={error("idCardNumber")}
         hint="13 digits. Dashes are fine — we will tidy them up."
       >
-        {({ id, describedBy, invalid }) => (
+        {({ id, describedBy, invalid, required }) => (
           <Input
             id={id}
             name="idCardNumber"
             inputMode="numeric"
             autoComplete="off"
             placeholder="42101-1234567-8"
+            required={required}
             aria-describedby={describedBy}
             invalid={invalid}
           />
@@ -54,12 +55,13 @@ export function ParticipantForm() {
       </Field>
 
       <Field label="Full name" required error={error("fullName")}>
-        {({ id, describedBy, invalid }) => (
+        {({ id, describedBy, invalid, required }) => (
           <Input
             id={id}
             name="fullName"
             autoComplete="name"
             placeholder="Your full name"
+            required={required}
             aria-describedby={describedBy}
             invalid={invalid}
           />
@@ -72,13 +74,14 @@ export function ParticipantForm() {
         error={error("email")}
         hint="Use the email address you registered for the event with."
       >
-        {({ id, describedBy, invalid }) => (
+        {({ id, describedBy, invalid, required }) => (
           <Input
             id={id}
             name="email"
             type="email"
             autoComplete="email"
             placeholder="you@example.com"
+            required={required}
             aria-describedby={describedBy}
             invalid={invalid}
           />
@@ -91,13 +94,14 @@ export function ParticipantForm() {
         error={error("phone")}
         hint="Any format — 0300-1234567 or +92 300 1234567."
       >
-        {({ id, describedBy, invalid }) => (
+        {({ id, describedBy, invalid, required }) => (
           <Input
             id={id}
             name="phone"
             type="tel"
             autoComplete="tel"
             placeholder="0300-1234567"
+            required={required}
             aria-describedby={describedBy}
             invalid={invalid}
           />
@@ -105,13 +109,14 @@ export function ParticipantForm() {
       </Field>
 
       <Field label="Location" required error={error("location")}>
-        {({ describedBy, invalid }) => (
+        {({ describedBy, invalid, required }) => (
           <RadioCards
             legend="Location"
             name="location"
             options={LOCATIONS}
             value={location}
             onChange={setLocation}
+            required={required}
             describedBy={describedBy}
             invalid={invalid}
           />
@@ -124,7 +129,7 @@ export function ParticipantForm() {
         error={error("password")}
         hint="At least 10 characters, with upper and lower case letters and a number."
       >
-        {({ id, describedBy, invalid }) => (
+        {({ id, describedBy, invalid, required }) => (
           <PasswordInput
             id={id}
             name="password"
@@ -132,6 +137,7 @@ export function ParticipantForm() {
             value={password}
             onValueChange={setPassword}
             showStrength
+            required={required}
             aria-describedby={describedBy}
             invalid={invalid}
           />
@@ -139,13 +145,14 @@ export function ParticipantForm() {
       </Field>
 
       <Field label="Confirm password" required error={error("confirmPassword")}>
-        {({ id, describedBy, invalid }) => (
+        {({ id, describedBy, invalid, required }) => (
           <PasswordInput
             id={id}
             name="confirmPassword"
             autoComplete="new-password"
             value={confirmPassword}
             onValueChange={setConfirmPassword}
+            required={required}
             aria-describedby={describedBy}
             invalid={invalid || (confirmPassword.length > 0 && confirmPassword !== password)}
           />

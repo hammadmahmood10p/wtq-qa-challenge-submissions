@@ -48,3 +48,8 @@ next-env.d.ts
 
 # keep the template committed
 !.env.example
+
+# playwright
+/test-results
+/playwright-report
+/blob-report

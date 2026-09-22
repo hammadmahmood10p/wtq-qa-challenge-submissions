@@ -80,7 +80,10 @@ reports `unreachable`, the app is running but cannot see Postgres; check `DATABA
 | Command | What it does |
 |---|---|
 | `pnpm dev` | Development server |
-| `pnpm build` / `pnpm start` | Production build and run |
+| `pnpm build` | Production build |
+| `pnpm start:standalone` | Run the production build (**not** `pnpm start` — see below) |
+| `pnpm test` | Unit tests (Vitest) — no database needed |
+| `pnpm test:e2e` | End-to-end tests (Playwright) — needs the database |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm lint` | ESLint |
 | `pnpm db:migrate` | Create and apply a migration (development) |
@@ -94,6 +97,11 @@ reports `unreachable`, the app is running but cannot see Postgres; check `DATABA
 The app builds to a standalone Node server (`output: "standalone"`), so it runs
 unchanged on Vercel, Azure App Service, AWS, or a VM behind nginx. A `Dockerfile` is
 included for container or on-prem hosting.
+
+> **`pnpm start` does not work with standalone output.** Next prints a warning and the
+> server misbehaves. Use `pnpm start:standalone` (`node .next/standalone/server.js`)
+> locally, and make sure whatever IT deploys to runs `server.js` rather than
+> `next start`. The `Dockerfile` already does the right thing.
 
 Whatever the target, it needs:
 

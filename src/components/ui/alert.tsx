@@ -1,8 +1,9 @@
-import { AlertCircle, CheckCircle2, Info } from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const STYLES = {
   error: { icon: AlertCircle, cls: "border-danger/30 bg-danger/8 text-danger" },
+  warning: { icon: AlertTriangle, cls: "border-warning/30 bg-warning/8 text-warning" },
   success: { icon: CheckCircle2, cls: "border-success/30 bg-success/8 text-success" },
   info: { icon: Info, cls: "border-info/30 bg-info/8 text-info" },
 } as const;

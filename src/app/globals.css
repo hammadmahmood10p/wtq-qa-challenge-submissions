@@ -146,6 +146,16 @@ body {
   border-radius: 2px;
 }
 
+/* Required-field marker.
+   Drawn with generated content rather than a <span> inside the <label>, so the
+   label's text stays exactly "Password" and not "Password *". That matters twice
+   over: it is the field's accessible name, and it is what a tester locates by. The
+   semantics come from the input's `required` attribute, not from this asterisk. */
+.required-mark::after {
+  content: " *";
+  color: var(--danger);
+}
+
 /* Tabular figures so the countdown does not jitter as digits change. */
 .tabular {
   font-variant-numeric: tabular-nums;

@@ -34,13 +34,14 @@ export function JudgeForm() {
         error={error("email")}
         hint={`Must end in ${JUDGE_EMAIL_DOMAIN}`}
       >
-        {({ id, describedBy, invalid }) => (
+        {({ id, describedBy, invalid, required }) => (
           <Input
             id={id}
             name="email"
             type="email"
             autoComplete="email"
             placeholder={`you${JUDGE_EMAIL_DOMAIN}`}
+            required={required}
             aria-describedby={describedBy}
             invalid={invalid}
           />
@@ -48,12 +49,13 @@ export function JudgeForm() {
       </Field>
 
       <Field label="Full name" required error={error("fullName")}>
-        {({ id, describedBy, invalid }) => (
+        {({ id, describedBy, invalid, required }) => (
           <Input
             id={id}
             name="fullName"
             autoComplete="name"
             placeholder="Your full name"
+            required={required}
             aria-describedby={describedBy}
             invalid={invalid}
           />
@@ -66,7 +68,7 @@ export function JudgeForm() {
         error={error("password")}
         hint="At least 10 characters, with upper and lower case letters and a number."
       >
-        {({ id, describedBy, invalid }) => (
+        {({ id, describedBy, invalid, required }) => (
           <PasswordInput
             id={id}
             name="password"
@@ -74,6 +76,7 @@ export function JudgeForm() {
             value={password}
             onValueChange={setPassword}
             showStrength
+            required={required}
             aria-describedby={describedBy}
             invalid={invalid}
           />
@@ -81,13 +84,14 @@ export function JudgeForm() {
       </Field>
 
       <Field label="Confirm password" required error={error("confirmPassword")}>
-        {({ id, describedBy, invalid }) => (
+        {({ id, describedBy, invalid, required }) => (
           <PasswordInput
             id={id}
             name="confirmPassword"
             autoComplete="new-password"
             value={confirmPassword}
             onValueChange={setConfirmPassword}
+            required={required}
             aria-describedby={describedBy}
             invalid={invalid || (confirmPassword.length > 0 && confirmPassword !== password)}
           />

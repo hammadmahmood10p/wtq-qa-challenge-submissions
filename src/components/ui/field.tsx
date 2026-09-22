@@ -9,7 +9,12 @@ interface FieldProps {
   error?: string;
   hint?: string;
   required?: boolean;
-  children: (props: { id: string; describedBy: string | undefined; invalid: boolean }) => React.ReactNode;
+  children: (props: {
+    id: string;
+    describedBy: string | undefined;
+    invalid: boolean;
+    required: boolean;
+  }) => React.ReactNode;
 }
 
 /**
@@ -27,16 +32,14 @@ export function Field({ label, error, hint, required, children }: FieldProps) {
 
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-sm font-medium">
+      <label
+        htmlFor={id}
+        className={cn("block text-sm font-medium", required && "required-mark")}
+      >
         {label}
-        {required && (
-          <span className="text-danger ml-1" aria-hidden="true">
-            *
-          </span>
-        )}
       </label>
 
-      {children({ id, describedBy, invalid: Boolean(error) })}
+      {children({ id, describedBy, invalid: Boolean(error), required: Boolean(required) })}
 
       {hint && !error && (
         <p id={hintId} className="text-muted text-xs">

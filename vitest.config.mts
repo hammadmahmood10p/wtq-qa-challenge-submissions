@@ -5,6 +5,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // e2e/ is Playwright's; vitest must not try to run those specs.
+    exclude: ["e2e/**", "node_modules/**"],
     // Keeps unit tests independent of a database or a .env file. Anything needing
     // either belongs in the Playwright suite, not here.
     env: {

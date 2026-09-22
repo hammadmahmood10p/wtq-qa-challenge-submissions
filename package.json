@@ -16,7 +16,10 @@
     "postinstall": "prisma generate",
     "gen:secrets": "node -e \"const c=require('crypto');console.log('SESSION_SECRET='+c.randomBytes(48).toString('base64url'));console.log('CNIC_PEPPER='+c.randomBytes(32).toString('base64url'));console.log('CNIC_ENCRYPTION_KEY='+c.randomBytes(32).toString('base64'))\"",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "start:standalone": "node .next/standalone/server.js"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -41,6 +44,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/pg": "^8.23.1",
