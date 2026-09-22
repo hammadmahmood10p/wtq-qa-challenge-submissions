@@ -1,0 +1,171 @@
+@import "tailwindcss";
+
+/* ===========================================================================
+   WTQ 2026 — Aurora design tokens
+   Specified in docs/DESIGN_LANGUAGE.md. Change values here, never in components.
+   =========================================================================== */
+
+:root {
+  /* --- Aurora brand spectrum ------------------------------------------- */
+  --aurora-violet: #6d28d9;
+  --aurora-violet-hover: #5b21b6;
+  --aurora-magenta: #db2777;
+  --aurora-amber: #f59e0b;
+  --aurora-gradient: linear-gradient(135deg, #6d28d9, #db2777 55%, #f59e0b);
+
+  /* --- Canvas (light) --------------------------------------------------- */
+  --bg: #faf9fc;
+  --surface: #ffffff;
+  --surface-raised: #f4f2f9;
+  --border: #e4e0ee;
+  --text: #1a1727;
+  --text-muted: #5d5878;
+
+  /* --- Semantic --------------------------------------------------------- */
+  --success: #059669;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --info: #0891b2;
+
+  /* --- Timer ramp (§2.4) ------------------------------------------------
+     The countdown must be readable peripherally. Every step is also paired
+     with a text cue, so colour is never the only signal. */
+  --timer-calm: #6d28d9; /* 3:00:00 - 0:30:00 */
+  --timer-caution: #d97706; /* 0:30:00 - 0:10:00 */
+  --timer-warning: #ea580c; /* 0:10:00 - 0:05:00 */
+  --timer-critical: #dc2626; /* under 0:05:00 */
+
+  /* --- Form ------------------------------------------------------------- */
+  --radius-card: 12px;
+  --radius-control: 8px;
+  /* Violet-tinted rather than grey, so cards sit on the canvas instead of
+     floating above a different colour temperature. */
+  --shadow-card: 0 4px 24px rgba(45, 27, 105, 0.08);
+  --shadow-raised: 0 8px 40px rgba(45, 27, 105, 0.12);
+
+  /* --- Motion (§4) ------------------------------------------------------ */
+  --duration-micro: 150ms;
+  --duration-standard: 250ms;
+  --duration-page: 400ms;
+  --ease-entrance: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* Dark is the default for the challenge runtime: a three-hour session on a bright
+   white page is genuinely tiring. Honour an explicit light choice if one is set. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0a14;
+    --surface: #151327;
+    --surface-raised: #1e1b34;
+    --border: #2a2645;
+    --text: #f4f2f9;
+    --text-muted: #a9a3c4;
+
+    /* Lifted for contrast against the Ink canvas. */
+    --success: #34d399;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --info: #22d3ee;
+
+    --timer-calm: #a78bfa;
+    --timer-caution: #fbbf24;
+    --timer-warning: #fb923c;
+    --timer-critical: #f87171;
+
+    --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
+    --shadow-raised: 0 8px 40px rgba(0, 0, 0, 0.55);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0b0a14;
+  --surface: #151327;
+  --surface-raised: #1e1b34;
+  --border: #2a2645;
+  --text: #f4f2f9;
+  --text-muted: #a9a3c4;
+
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --info: #22d3ee;
+
+  --timer-calm: #a78bfa;
+  --timer-caution: #fbbf24;
+  --timer-warning: #fb923c;
+  --timer-critical: #f87171;
+
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-raised: 0 8px 40px rgba(0, 0, 0, 0.55);
+}
+
+/* Expose the tokens to Tailwind utilities: bg-surface, text-muted, rounded-card... */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+
+  --color-violet: var(--aurora-violet);
+  --color-violet-hover: var(--aurora-violet-hover);
+  --color-magenta: var(--aurora-magenta);
+  --color-amber: var(--aurora-amber);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+
+  --color-timer-calm: var(--timer-calm);
+  --color-timer-caution: var(--timer-caution);
+  --color-timer-warning: var(--timer-warning);
+  --color-timer-critical: var(--timer-critical);
+
+  --radius-card: var(--radius-card);
+  --radius-control: var(--radius-control);
+
+  --font-display: var(--font-sora), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Focus is always visible. Never remove this. (§5) */
+:focus-visible {
+  outline: 2px solid var(--aurora-violet);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Tabular figures so the countdown does not jitter as digits change. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.aurora-text {
+  background: var(--aurora-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Nobody should be fighting the interface for three hours. (§4) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,324 @@
+// WTQ 2026 — QA Challenge Submission Portal
+// Data model v1. See docs/ARCHITECTURE_AND_PHASES.md §4 for the rationale.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// Prisma 7 no longer accepts connection URLs here — they live in prisma.config.ts
+// (CLI / migrations) and in src/lib/db.ts (runtime). See the note in prisma.config.ts
+// about why the two use different connections.
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  SUPER_ADMIN
+  JUDGE
+  PARTICIPANT
+}
+
+enum UserStatus {
+  PENDING_APPROVAL // judges only, until a super admin approves
+  ACTIVE
+  BLOCKED
+  SUBMITTED_LOCKED // participant has finally submitted; cannot log in again
+  REMOVED // soft delete
+}
+
+enum Location {
+  KARACHI
+  LAHORE
+  ISLAMABAD
+}
+
+enum AttemptState {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  EXPIRED
+}
+
+enum Challenge1ItemKind {
+  BUG_REPORT
+  TEST_CASE
+}
+
+enum EvaluationStatus {
+  ASSIGNED // auto-assigned on participant submit, not yet opened
+  IN_PROGRESS // judge has opened it and may have saved partial scores
+  SUBMITTED // final score submitted; locked
+}
+
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  role         Role
+  // Always stored lowercased. Uniqueness is enforced here, across all roles.
+  email        String     @unique
+  fullName     String
+  passwordHash String
+  status       UserStatus
+
+  // Set after an admin-issued temporary password; forces a change at next login.
+  mustChangePassword Boolean @default(false)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastLoginAt DateTime?
+  deletedAt   DateTime?
+
+  // Populated when a super admin creates the account rather than the user signing up.
+  createdById String? @db.Uuid
+  createdBy   User?   @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdUsers User[] @relation("UserCreatedBy")
+
+  participantProfile ParticipantProfile?
+  judgeProfile       JudgeProfile?
+  sessions           Session[]
+  auditEvents        AuditLog[]        @relation("AuditActor")
+  evaluations        Evaluation[]      @relation("EvaluationJudge")
+  approvedJudges     JudgeProfile[]    @relation("JudgeApprovedBy")
+  unlocksGranted     EvaluationUnlock[] @relation("UnlockGrantedBy")
+
+  @@index([role, status])
+  @@index([status])
+  @@map("users")
+}
+
+model ParticipantProfile {
+  userId String @id @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // CNIC is sensitive PII. See docs/DELIVERY_PLAN.md §3.1:
+  //   - idCardHash      : deterministic HMAC-SHA256 (peppered). Indexed; what login and
+  //                       duplicate detection match against.
+  //   - idCardEncrypted : AES-256-GCM ciphertext. Decrypted only for display.
+  // Encrypting alone would make the column unindexable and break login-by-CNIC.
+  idCardHash      String @unique
+  idCardEncrypted String
+
+  // E.164, e.g. +923001234567. Normalised on input so any typed format resolves here.
+  phoneE164 String   @unique
+  location  Location
+
+  attempt Attempt?
+
+  @@index([location])
+  @@map("participant_profiles")
+}
+
+model JudgeProfile {
+  userId String @id @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  approvedById String?   @db.Uuid
+  approvedBy   User?     @relation("JudgeApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt   DateTime?
+
+  @@map("judge_profiles")
+}
+
+// Server-side session record. The JWT carries only this row's id, so blocking a user
+// or final submission revokes every open tab immediately.
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  ip        String?
+  userAgent String?
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ---------------------------------------------------------------------------
+// The participant's run
+// ---------------------------------------------------------------------------
+
+model Attempt {
+  id            String   @id @default(uuid()) @db.Uuid
+  participantId String   @unique @db.Uuid
+  participant   ParticipantProfile @relation(fields: [participantId], references: [userId], onDelete: Cascade)
+
+  // The clock. Authoritative on the server; the browser only renders a countdown
+  // derived from endsAt. Every write re-checks now() < endsAt independently.
+  startedAt       DateTime?
+  endsAt          DateTime?
+  durationMinutes Int       @default(180)
+
+  state         AttemptState @default(NOT_STARTED)
+  submittedAt   DateTime?
+  autoSubmitted Boolean      @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  challenge1Items Challenge1Item[]
+  challenge2      Challenge2Submission?
+  challenge3      Challenge3Submission?
+  evaluation      Evaluation?
+
+  @@index([state])
+  @@index([endsAt])
+  @@map("attempts")
+}
+
+// Bug reports and test cases share a table — identical shape, different kind.
+model Challenge1Item {
+  id        String             @id @default(uuid()) @db.Uuid
+  attemptId String             @db.Uuid
+  attempt   Attempt            @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  kind      Challenge1ItemKind
+  title     String
+  description String
+  position  Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([attemptId, kind, position])
+  @@map("challenge1_items")
+}
+
+model Challenge2Submission {
+  attemptId String  @id @db.Uuid
+  attempt   Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  // Opaque storage key. Never a path the client can construct or guess.
+  fileKey          String
+  originalFilename String
+  sizeBytes        Int
+  contentType      String
+  uploadedAt       DateTime @default(now())
+
+  @@map("challenge2_submissions")
+}
+
+model Challenge3Submission {
+  attemptId String  @id @db.Uuid
+  attempt   Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  githubUrl String
+  // Best-effort reachability check at save time. A false here warns but never blocks:
+  // a GitHub outage must not cost a participant their submission.
+  verifiedPublic Boolean?
+  savedAt        DateTime @default(now())
+
+  @@map("challenge3_submissions")
+}
+
+// ---------------------------------------------------------------------------
+// Judging
+// ---------------------------------------------------------------------------
+
+// One row per attempt, created by auto-assignment the moment a participant submits.
+// UNIQUE on attemptId is the database backstop against two judges scoring one submission.
+model Evaluation {
+  id        String  @id @default(uuid()) @db.Uuid
+  attemptId String  @unique @db.Uuid
+  attempt   Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  judgeId String @db.Uuid
+  judge   User   @relation("EvaluationJudge", fields: [judgeId], references: [id])
+
+  assignedAt DateTime  @default(now())
+  // Soft claim: refreshed while a judge has the review page open. Expires on inactivity.
+  claimedAt  DateTime?
+
+  scoreC1        Decimal?  @db.Decimal(6, 2)
+  scoreC1SavedAt DateTime?
+  scoreC2        Decimal?  @db.Decimal(6, 2)
+  scoreC2Bonus   Decimal?  @db.Decimal(6, 2)
+  scoreC2SavedAt DateTime?
+  scoreC3        Decimal?  @db.Decimal(6, 2)
+  scoreC3SavedAt DateTime?
+
+  // Frozen at the moment of final submission, so a later change to the score
+  // configuration can never retroactively alter a submitted result.
+  totalScore  Decimal?         @db.Decimal(6, 2)
+  status      EvaluationStatus @default(ASSIGNED)
+  submittedAt DateTime?
+
+  unlocks EvaluationUnlock[]
+
+  @@index([judgeId, status])
+  @@index([status])
+  @@map("evaluations")
+}
+
+// A locked evaluation can only be reopened by a super admin, with a reason, audited.
+model EvaluationUnlock {
+  id           String     @id @default(uuid()) @db.Uuid
+  evaluationId String     @db.Uuid
+  evaluation   Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  unlockedById String @db.Uuid
+  unlockedBy   User   @relation("UnlockGrantedBy", fields: [unlockedById], references: [id])
+  reason       String
+  unlockedAt   DateTime @default(now())
+
+  @@index([evaluationId])
+  @@map("evaluation_unlocks")
+}
+
+// ---------------------------------------------------------------------------
+// Operations
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id      String  @id @default(uuid()) @db.Uuid
+  // Null for system-initiated actions such as timer auto-submit.
+  actorId String? @db.Uuid
+  actor   User?   @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  actorRole  Role?
+  action     String
+  entityType String?
+  entityId   String?
+  metadata   Json?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_log")
+}
+
+// Postgres-backed rate limiting, so no Redis server is required.
+// Swappable for a Redis driver if IT provides one.
+model RateLimit {
+  key         String   @id
+  count       Int      @default(0)
+  windowStart DateTime @default(now())
+
+  @@index([windowStart])
+  @@map("rate_limits")
+}
+
+// Key/value configuration, so the scoring scale is never hardcoded and can be set
+// as late as the day before the event without a deployment.
+// Keys: max_score_c1, max_score_c2, max_score_c2_bonus, max_score_c3,
+//       attempt_duration_minutes, results_published
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
+}
