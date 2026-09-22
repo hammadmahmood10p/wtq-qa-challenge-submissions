@@ -41,5 +41,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      # Unit tests run without a database or a .env — see vitest.config.mts.
+      - name: Test
+        run: pnpm test
+
       - name: Build
         run: pnpm build

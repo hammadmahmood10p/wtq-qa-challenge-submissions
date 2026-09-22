@@ -14,7 +14,9 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "postinstall": "prisma generate",
-    "gen:secrets": "node -e \"const c=require('crypto');console.log('SESSION_SECRET='+c.randomBytes(48).toString('base64url'));console.log('CNIC_PEPPER='+c.randomBytes(32).toString('base64url'));console.log('CNIC_ENCRYPTION_KEY='+c.randomBytes(32).toString('base64'))\""
+    "gen:secrets": "node -e \"const c=require('crypto');console.log('SESSION_SECRET='+c.randomBytes(48).toString('base64url'));console.log('CNIC_PEPPER='+c.randomBytes(32).toString('base64url'));console.log('CNIC_ENCRYPTION_KEY='+c.randomBytes(32).toString('base64'))\"",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -49,7 +51,8 @@
     "prisma": "^7.10.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.1"
   },
   "packageManager": "pnpm@12.4.2"
 }
