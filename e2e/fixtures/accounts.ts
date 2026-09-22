@@ -57,6 +57,13 @@ export async function seedAccounts() {
   const db = await connect();
   try {
     await db.query(`DELETE FROM users WHERE email LIKE $1`, [`${E2E_PREFIX}%`]);
+
+    // The suite logs in far more often than a person would, and the per-account limit
+    // is deliberately tight (10 per 5 minutes). Clearing the counters keeps the tests
+    // measuring the app rather than the rate limiter — a real limit that these runs
+    // legitimately exceed.
+    await db.query(`DELETE FROM rate_limits`);
+
     const passwordHash = await hashPassword(E2E_PASSWORD);
 
     const addUser = async (

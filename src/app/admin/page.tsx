@@ -1,51 +1,79 @@
+import { ArrowRight, Gavel, Users } from "lucide-react";
+import Link from "next/link";
 import type { Metadata } from "next";
+import { Alert } from "@/components/ui/alert";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { rosterCounts } from "@/lib/roster";
 
 export const metadata: Metadata = { title: "Super Admin — WTQ 2026" };
 
-/**
- * Placeholder. The real console lands on Day 4: Manage Participants, Manage Judges
- * and the audit log (docs/DELIVERY_PLAN.md §4).
- *
- * The counts are live, so it doubles as proof the role boundary and the database
- * wiring both work end to end.
- */
 export default async function AdminHome() {
   const user = await requireRole("SUPER_ADMIN");
-
-  const [participants, judgesPending, judgesActive] = await Promise.all([
-    db.user.count({ where: { role: "PARTICIPANT", status: { not: "REMOVED" } } }),
-    db.user.count({ where: { role: "JUDGE", status: "PENDING_APPROVAL" } }),
-    db.user.count({ where: { role: "JUDGE", status: "ACTIVE" } }),
-  ]);
+  const counts = await rosterCounts();
 
   const tiles = [
-    { label: "Participants registered", value: participants },
-    { label: "Judges awaiting approval", value: judgesPending },
-    { label: "Judges approved", value: judgesActive },
+    { label: "Participants registered", value: counts.participants, href: "/admin/participants" },
+    { label: "Participants blocked", value: counts.participantsBlocked, href: "/admin/participants?status=BLOCKED" },
+    { label: "Judges awaiting approval", value: counts.judgesPending, href: "/admin/judges?status=PENDING_APPROVAL" },
+    { label: "Judges approved", value: counts.judgesActive, href: "/admin/judges?status=ACTIVE" },
   ];
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="font-display text-2xl font-bold">Welcome, {user.fullName}</h1>
-        <p className="text-muted mt-1.5 text-sm">
-          Manage Participants, Manage Judges and Participants Submission Details arrive on Day 4.
-        </p>
+        <p className="text-muted mt-1.5 text-sm">Women Tech Quest 2026 — Saturday 10 October.</p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      {counts.judgesPending > 0 && (
+        <Alert variant="warning" title={`${counts.judgesPending} judge account(s) awaiting approval`}>
+          <Link href="/admin/judges?status=PENDING_APPROVAL" className="underline">
+            Review them now
+          </Link>{" "}
+          — they cannot log in until approved.
+        </Alert>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {tiles.map((tile) => (
-          <div
+          <Link
             key={tile.label}
-            className="border-border bg-surface shadow-(--shadow-card) rounded-(--radius-card) border p-5"
+            href={tile.href}
+            className="group border-border bg-surface shadow-(--shadow-card) hover:border-violet/50 rounded-(--radius-card) border p-5 transition-all duration-(--duration-standard) hover:-translate-y-0.5"
           >
-            <p className="font-display tabular text-3xl font-bold">{tile.value}</p>
+            <p className="font-display tabular text-3xl font-bold">{tile.value.toLocaleString()}</p>
             <p className="text-muted mt-1 text-sm">{tile.label}</p>
-          </div>
+          </Link>
         ))}
       </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {[
+          { href: "/admin/participants", icon: Users, title: "Manage Participants", body: "Add, block, remove or reset a participant's password." },
+          { href: "/admin/judges", icon: Gavel, title: "Manage Judges", body: "Approve accounts, add judges, block or remove them." },
+        ].map(({ href, icon: Icon, title, body }) => (
+          <Link
+            key={href}
+            href={href}
+            className="group border-border bg-surface shadow-(--shadow-card) hover:border-violet/50 flex items-start gap-4 rounded-(--radius-card) border p-5 transition-all duration-(--duration-standard) hover:-translate-y-0.5"
+          >
+            <span className="bg-violet/10 text-violet flex size-10 shrink-0 items-center justify-center rounded-(--radius-control)">
+              <Icon size={19} />
+            </span>
+            <div className="min-w-0">
+              <p className="font-display flex items-center gap-2 font-semibold">
+                {title}
+                <ArrowRight size={15} className="text-muted transition-transform duration-(--duration-standard) group-hover:translate-x-1" />
+              </p>
+              <p className="text-muted mt-1 text-sm">{body}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      <p className="text-muted text-sm">
+        Participants Submission Details arrives on Day 9, once the challenge runtime is in place.
+      </p>
     </div>
   );
 }

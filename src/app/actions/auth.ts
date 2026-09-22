@@ -6,7 +6,7 @@ import { HOME_FOR_ROLE } from "@/lib/auth";
 import { INVALID_CREDENTIALS, loginRefusalMessage } from "@/lib/auth-messages";
 import { db } from "@/lib/db";
 import { fakeVerify, hashPassword, verifyPassword } from "@/lib/password";
-import { LIMITS, rateLimit, rateLimitByIp } from "@/lib/rate-limit";
+import { LIMITS, accountRateLimitKey, rateLimit, rateLimitByIp } from "@/lib/rate-limit";
 import {
   createSession,
   destroySession,
@@ -45,10 +45,12 @@ export async function login(_prev: AuthState, formData: FormData): Promise<AuthS
 
   const { username, password } = parsed.data;
 
-  // Per-account limit as well as per-IP: a venue full of participants shares one NAT
+  // Per-account as well as per-IP: a venue full of participants shares one NAT
   // address, so an IP limit alone cannot be tight enough to stop an attack on a
-  // single account without locking out a whole city.
-  const accountLimit = await rateLimit(`login:account:${username.toLowerCase()}`, LIMITS.loginPerAccount);
+  // single account without locking out a whole city. The key is built from the
+  // normalised identifier so the budget cannot be multiplied by retyping the same
+  // person a different way.
+  const accountLimit = await rateLimit(accountRateLimitKey(username), LIMITS.loginPerAccount);
   if (!accountLimit.allowed) {
     return {
       message: `Too many attempts for this account. Please wait ${Math.ceil(accountLimit.retryAfterSeconds / 60)} minute(s) and try again.`,

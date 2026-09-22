@@ -181,6 +181,8 @@ If any weekend time becomes available, that is where it goes.
 
 **R6 — 1000 QA engineers attacking the portal.** **Mitigation:** Day 12 exists for this. Server-authoritative everything.
 
+**R6b — Rate limits sized for the wrong shape of traffic.** *Found on Day 4.* Two mistakes, both now fixed, both worth remembering because the trap recurs wherever a limit is added. First, the per-IP login allowance was set as though one address meant one person — but all three cities start together and each venue sits behind a single NAT address, so a limit tuned for an individual would have locked out a whole city at 10am. Second, and worse, the per-account counter keyed on the *typed* string: `0300-5555551`, `+923005555551` and `42101-5555555-1` each received their own budget, handing an attacker one allowance per format they could think of against a system that deliberately accepts six. The key is now derived from the normalised identifier. **Mitigation:** both are pinned by unit tests that assert the shape rather than the number; the numbers themselves are a judgement and must be re-checked against the Day 12 load test.
+
 **R7 — The application under test (Q8) is not ready.** Challenge 1 is unusable without it, and it must survive 1000 users. **Mitigation:** needed by **2 Oct** for the information page.
 
 **R8 — Scope creep.** At 14 days, one new requirement now displaces testing directly. **Mitigation:** §5 is the contract.
