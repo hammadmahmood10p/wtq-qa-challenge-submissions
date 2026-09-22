@@ -227,6 +227,8 @@ test.describe("the attempt is the authority", () => {
   test("sends a participant away from a closed attempt", async ({ page }) => {
     await closeAttempt(ACCOUNTS.participant.email);
     await page.goto("/challenge/c1");
-    await expect(page).toHaveURL(/\/challenge\/done$/);
+    // /submitted is public, because sealing an attempt revokes the session that would
+    // be needed to render anything else.
+    await expect(page).toHaveURL(/\/submitted$/);
   });
 });

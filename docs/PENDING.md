@@ -41,7 +41,8 @@ it is marked *post-event*.
 | **T1** | `middleware.ts` uses a convention Next 16 deprecates in favour of `proxy` | Works, warns on dev start. A framework convention change is not worth the risk this close to the event |
 | **T2** | Server action body limit raised to 25MB for Challenge 2 uploads | Fine functionally; the concurrency behaviour of large uploads is a Day 12 load-test question, not a correctness one |
 | **T3** | GitHub reachability check is best-effort and unauthenticated | Rate limits and outages must never cost a participant their submission, so it warns rather than blocks |
-| **T4** | No offline retry queue for autosave yet | Day 8. Saves currently surface an error and can be retried with the entry's own save button |
+| **T4** | No offline retry queue for autosave | Deferred to the Day 11 polish pass. A failed save shows an error and can be retried with the entry's own save button, so nothing is lost silently — but a participant on a dropping connection currently has to notice and press it |
+| **T5** | Cross-tab closure uses BroadcastChannel, which is same-browser only | Correct for the scenario in the brief (several tabs, one machine). A second *device* would notice at the next status poll instead, within a minute. Not worth a server-push channel for this event |
 
 ---
 

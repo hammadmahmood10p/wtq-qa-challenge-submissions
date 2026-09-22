@@ -30,6 +30,12 @@ interface Options {
   initialRemainingMs: number;
   /** Called once when the countdown reaches zero. */
   onExpire?: () => void;
+  /**
+   * Called when the server says the attempt is no longer running — the clock ran out,
+   * or another tab submitted. This is the backstop behind the BroadcastChannel, and
+   * the only one that works across devices.
+   */
+  onClosed?: () => void;
 }
 
 /**
@@ -49,7 +55,7 @@ interface Options {
  *    (~200ms here) optimistic. That is deliberate and harmless: this is a display, and
  *    the server independently refuses writes past the real deadline.
  */
-export function useCountdown({ initialRemainingMs, onExpire }: Options) {
+export function useCountdown({ initialRemainingMs, onExpire, onClosed }: Options) {
   const [remainingMs, setRemainingMs] = useState(initialRemainingMs);
 
   // Deadline expressed against the browser's own clock. Only ever written in effects.
@@ -58,9 +64,11 @@ export function useCountdown({ initialRemainingMs, onExpire }: Options) {
   // Held in a ref so a caller passing an inline arrow does not restart the interval
   // on every render. Kept current in its own effect rather than during render.
   const onExpireRef = useRef(onExpire);
+  const onClosedRef = useRef(onClosed);
   useEffect(() => {
     onExpireRef.current = onExpire;
-  }, [onExpire]);
+    onClosedRef.current = onClosed;
+  }, [onExpire, onClosed]);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,7 +96,14 @@ export function useCountdown({ initialRemainingMs, onExpire }: Options) {
         const response = await fetch("/api/attempt/status", { cache: "no-store" });
         if (!response.ok || cancelled) return;
 
-        const data = (await response.json()) as { remainingMs: number };
+        const data = (await response.json()) as { remainingMs: number; state: string };
+
+        // Sealed while this tab was not looking.
+        if (data.state && data.state !== "IN_PROGRESS") {
+          onClosedRef.current?.();
+          return;
+        }
+
         if (typeof data.remainingMs !== "number") return;
 
         deadlineRef.current = Date.now() + data.remainingMs;

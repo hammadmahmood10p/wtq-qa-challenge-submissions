@@ -2,7 +2,8 @@
 
 import { BookOpen, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
+import { onAttemptClosed } from "@/lib/attempt-channel";
 import { cn } from "@/lib/utils";
 import { useCountdown, type TimerPhase } from "./use-countdown";
 
@@ -38,9 +39,29 @@ export function ChallengeHeader({
 }) {
   const router = useRouter();
 
-  // The server already treats the attempt as expired; refreshing lets it say so.
-  const onExpire = useCallback(() => router.refresh(), [router]);
-  const { formatted, phase, remainingMs } = useCountdown({ initialRemainingMs, onExpire });
+  /**
+   * Three ways this attempt can end under a tab's feet, all landing here:
+   *   - the clock reaching zero in this tab (onExpire)
+   *   - the server reporting it closed at the next poll (onClosed)
+   *   - another tab submitting (the BroadcastChannel below)
+   *
+   * `replace` rather than `push`, because there is nothing to go back to.
+   */
+  const leave = useCallback(
+    (reason: "submitted" | "expired") => router.replace(`/submitted?reason=${reason}`),
+    [router],
+  );
+
+  const onExpire = useCallback(() => leave("expired"), [leave]);
+  const onClosed = useCallback(() => leave("submitted"), [leave]);
+
+  useEffect(() => onAttemptClosed(() => leave("submitted")), [leave]);
+
+  const { formatted, phase, remainingMs } = useCountdown({
+    initialRemainingMs,
+    onExpire,
+    onClosed,
+  });
 
   const color = PHASE_COLOR[phase];
   const urgent = phase === "critical" || phase === "expired";

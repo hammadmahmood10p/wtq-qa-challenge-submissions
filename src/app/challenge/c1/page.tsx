@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { Challenge1Workspace } from "@/components/challenge/challenge1-workspace";
 import { ChallengeHeader } from "@/components/challenge/challenge-header";
+import { SubmitButton } from "@/components/challenge/submit-button";
 import { Alert } from "@/components/ui/alert";
 import { getAttempt } from "@/lib/attempt";
 import { requireRole } from "@/lib/auth";
@@ -23,7 +24,7 @@ export default async function Challenge1Page() {
   const attempt = await getAttempt(user.id);
 
   if (attempt.state === "NOT_STARTED") redirect("/challenge");
-  if (attempt.state === "SUBMITTED" || attempt.state === "EXPIRED") redirect("/challenge/done");
+  if (attempt.state === "SUBMITTED" || attempt.state === "EXPIRED") redirect("/submitted");
 
   const challenge = challengeById("c1")!;
   const items = await listChallenge1Items(attempt.id);
@@ -31,7 +32,9 @@ export default async function Challenge1Page() {
 
   return (
     <>
-      <ChallengeHeader initialRemainingMs={attempt.remainingMs} />
+      <ChallengeHeader initialRemainingMs={attempt.remainingMs}>
+        <SubmitButton />
+      </ChallengeHeader>
 
       <main className="mx-auto max-w-3xl space-y-8 px-4 py-8 sm:px-6">
         <header>

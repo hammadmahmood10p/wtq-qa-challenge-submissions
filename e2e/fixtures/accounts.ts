@@ -139,6 +139,13 @@ export async function resetAttempt(email: string) {
       [email],
     );
 
+    // Submitting locks the account, so a reset has to reopen it or the next test
+    // cannot log in.
+    await db.query(
+      `UPDATE users SET status = 'ACTIVE' WHERE email = $1 AND status = 'SUBMITTED_LOCKED'`,
+      [email],
+    );
+
     // The suite signs the same participant in once per test, which a real person
     // would never do — the per-account limit is 10 attempts in 5 minutes and it is
     // deliberately tight. Clearing the counters keeps these tests measuring the
@@ -249,6 +256,62 @@ export async function challenge3Row(email: string) {
   } finally {
     await db.end();
   }
+}
+
+export async function attemptRow(email: string) {
+  const db = await connect();
+  try {
+    const result = await db.query<{
+      id: string;
+      state: string;
+      submittedAt: Date | null;
+      autoSubmitted: boolean;
+      endsAt: Date | null;
+    }>(
+      `SELECT a.id, a.state, a."submittedAt", a."autoSubmitted", a."endsAt"
+       FROM attempts a JOIN users u ON u.id = a."participantId"
+       WHERE u.email = $1`,
+      [email],
+    );
+    return result.rows[0] ?? null;
+  } finally {
+    await db.end();
+  }
+}
+
+export async function userStatus(email: string): Promise<string | null> {
+  const db = await connect();
+  try {
+    const result = await db.query<{ status: string }>(
+      `SELECT status FROM users WHERE email = $1`,
+      [email],
+    );
+    return result.rows[0]?.status ?? null;
+  } finally {
+    await db.end();
+  }
+}
+
+/** Every evaluation for a participant — plural, so "there is exactly one" is testable. */
+export async function evaluationRows(email: string) {
+  const db = await connect();
+  try {
+    const result = await db.query<{ id: string; judgeId: string; status: string }>(
+      `SELECT e.id, e."judgeId", e.status
+       FROM evaluations e
+       JOIN attempts a ON a.id = e."attemptId"
+       JOIN users u ON u.id = a."participantId"
+       WHERE u.email = $1`,
+      [email],
+    );
+    return result.rows;
+  } finally {
+    await db.end();
+  }
+}
+
+export async function evaluationRow(email: string) {
+  return (await evaluationRows(email))[0] ?? null;
 }
 
 export async function cleanupAccounts() {

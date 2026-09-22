@@ -85,39 +85,30 @@ export async function startAttempt(participantId: string): Promise<AttemptView> 
 }
 
 /**
- * Reads the attempt, resolving expiry as it goes.
+ * Reads the attempt, auto-submitting it if the time has run out.
  *
- * An attempt whose time has passed is EXPIRED even if the participant's browser was
- * closed and nothing ever told the server. Deciding this on read means there is no
- * scheduled job to fail silently — any request that touches the attempt settles it.
+ * Decision D1 is a hard auto-submit: at zero, whatever was saved is submitted and the
+ * participant is locked out, exactly as if they had pressed the button. Both routes
+ * go through finalizeAttempt so they cannot drift apart.
  *
- * Day 8 turns this into the full auto-submit (D1); for now it stops the clock and
- * closes the workspace.
+ * It resolves on read rather than from a scheduled job. Any request that touches the
+ * attempt settles it — so there is no cron to fail silently while a participant keeps
+ * typing, and an attempt whose browser was closed at 2h50m is still sealed correctly.
  */
 export const getAttempt = cache(async (participantId: string): Promise<AttemptView> => {
-  const attempt = await ensureAttempt(participantId);
+  let attempt = await ensureAttempt(participantId);
   const serverNow = new Date();
 
-  let state = attempt.state;
+  if (attempt.state === "IN_PROGRESS" && attempt.endsAt && attempt.endsAt <= serverNow) {
+    // Imported lazily: attempt-submit imports this module for its types, and a static
+    // import both ways is a cycle.
+    const { finalizeAttempt } = await import("@/lib/attempt-submit");
+    await finalizeAttempt(participantId, { auto: true });
 
-  if (state === "IN_PROGRESS" && attempt.endsAt && attempt.endsAt <= serverNow) {
-    const { count } = await db.attempt.updateMany({
-      where: { id: attempt.id, state: "IN_PROGRESS" },
-      data: { state: "EXPIRED" },
-    });
-    state = "EXPIRED";
-
-    if (count > 0) {
-      await audit({
-        action: "attempt.auto_submitted",
-        actorId: participantId,
-        actorRole: "PARTICIPANT",
-        entityType: "attempt",
-        entityId: attempt.id,
-        metadata: { reason: "time_expired" },
-      });
-    }
+    attempt = await db.attempt.findUniqueOrThrow({ where: { participantId } });
   }
+
+  const state = attempt.state;
 
   return {
     id: attempt.id,

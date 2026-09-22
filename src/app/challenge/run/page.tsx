@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { ChallengeHeader } from "@/components/challenge/challenge-header";
 import { ChallengeTabs } from "@/components/challenge/challenge-tabs";
+import { SubmitButton } from "@/components/challenge/submit-button";
 import { getAttempt } from "@/lib/attempt";
 import { requireRole } from "@/lib/auth";
 
@@ -19,14 +20,12 @@ export default async function ChallengeRunPage() {
   const attempt = await getAttempt(user.id);
 
   if (attempt.state === "NOT_STARTED") redirect("/challenge");
-  if (attempt.state === "SUBMITTED" || attempt.state === "EXPIRED") redirect("/challenge/done");
+  if (attempt.state === "SUBMITTED" || attempt.state === "EXPIRED") redirect("/submitted");
 
   return (
     <>
       <ChallengeHeader initialRemainingMs={attempt.remainingMs}>
-        {/* The Submit button and its confirmation modal land on Day 8, together with
-            the transactional seal and the account lock. Shipping the button before
-            the action behind it would be worse than shipping neither. */}
+        <SubmitButton />
       </ChallengeHeader>
 
       <main className="mx-auto max-w-4xl px-4 pb-16 sm:px-6">
