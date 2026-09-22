@@ -149,6 +149,66 @@ export async function resetAttempt(email: string) {
   }
 }
 
+/** Puts a participant mid-attempt, with the clock running. */
+export async function startAttemptFor(email: string, minutes = 180) {
+  const db = await connect();
+  try {
+    await db.query(
+      `INSERT INTO attempts (id, "participantId", "startedAt", "endsAt", "durationMinutes", state, "updatedAt")
+       SELECT gen_random_uuid(), id, NOW(), NOW() + make_interval(mins => $2::int), $2::int, 'IN_PROGRESS', NOW()
+       FROM users WHERE email = $1
+       ON CONFLICT ("participantId") DO UPDATE
+         SET "startedAt" = NOW(),
+             "endsAt" = NOW() + make_interval(mins => $2::int),
+             "durationMinutes" = $2::int,
+             state = 'IN_PROGRESS',
+             "updatedAt" = NOW()`,
+      [email, minutes],
+    );
+  } finally {
+    await db.end();
+  }
+}
+
+/**
+ * Ends an attempt without deleting it, so the work stays behind.
+ *
+ * This is how a tab left open past the deadline is simulated: the server has moved on
+ * and the page has not noticed, which is exactly the state a post-close write arrives
+ * in.
+ */
+export async function closeAttempt(email: string, state: "SUBMITTED" | "EXPIRED" = "SUBMITTED") {
+  const db = await connect();
+  try {
+    await db.query(
+      `UPDATE attempts SET state = $2, "submittedAt" = NOW(), "updatedAt" = NOW()
+       WHERE "participantId" IN (SELECT id FROM users WHERE email = $1)`,
+      [email, state],
+    );
+  } finally {
+    await db.end();
+  }
+}
+
+/** Reads Challenge 1 titles straight from the database, bypassing the interface. */
+export async function challenge1Titles(email: string): Promise<string[]> {
+  const db = await connect();
+  try {
+    const result = await db.query<{ title: string }>(
+      `SELECT i.title
+       FROM challenge1_items i
+       JOIN attempts a ON a.id = i."attemptId"
+       JOIN users u ON u.id = a."participantId"
+       WHERE u.email = $1
+       ORDER BY i.kind, i.position`,
+      [email],
+    );
+    return result.rows.map((r) => r.title);
+  } finally {
+    await db.end();
+  }
+}
+
 export async function cleanupAccounts() {
   const db = await connect();
   try {
