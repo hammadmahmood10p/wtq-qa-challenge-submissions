@@ -61,10 +61,10 @@ test.describe("logging in with any registered identifier", () => {
   for (const [label, identifier] of cases) {
     test(`accepts ${label}`, async ({ page }) => {
       await loginAs(page, identifier, E2E_PASSWORD);
+      // Participants land on the challenge briefing.
       await expect(page).toHaveURL(/\/challenge$/);
-      await expect(
-        page.getByRole("heading", { name: `Welcome, ${ACCOUNTS.participant.fullName}` }),
-      ).toBeVisible();
+      // Whichever identifier was typed, it resolved to the same account.
+      await expect(page.locator("header").getByText(ACCOUNTS.participant.fullName)).toBeVisible();
     });
   }
 });

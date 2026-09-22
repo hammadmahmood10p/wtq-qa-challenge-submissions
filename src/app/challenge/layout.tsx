@@ -1,13 +1,13 @@
-import { AppHeader } from "@/components/app-header";
 import { requireRole } from "@/lib/auth";
 
+/**
+ * Authorisation boundary for every participant route.
+ *
+ * Deliberately renders no header: the briefing shows the normal app header, while the
+ * workspace replaces it with the sticky countdown. Stacking both would push the clock
+ * down the page, and requirement 3 says it must always be visible.
+ */
 export default async function ChallengeLayout({ children }: { children: React.ReactNode }) {
-  const user = await requireRole("PARTICIPANT");
-
-  return (
-    <div className="min-h-dvh">
-      <AppHeader user={user} />
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">{children}</main>
-    </div>
-  );
+  await requireRole("PARTICIPANT");
+  return <div className="min-h-dvh">{children}</div>;
 }

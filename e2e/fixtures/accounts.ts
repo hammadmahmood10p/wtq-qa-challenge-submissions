@@ -122,6 +122,33 @@ export async function seedAccounts() {
   }
 }
 
+/**
+ * Puts a participant back before the start line.
+ *
+ * An attempt is deliberately once-only and unrestartable, which is exactly what makes
+ * it awkward to test — so the reset happens in the database rather than through any
+ * route the application exposes. There is no "start again" path in the product, and
+ * there must not be.
+ */
+export async function resetAttempt(email: string) {
+  const db = await connect();
+  try {
+    await db.query(
+      `DELETE FROM attempts
+       WHERE "participantId" IN (SELECT id FROM users WHERE email = $1)`,
+      [email],
+    );
+
+    // The suite signs the same participant in once per test, which a real person
+    // would never do — the per-account limit is 10 attempts in 5 minutes and it is
+    // deliberately tight. Clearing the counters keeps these tests measuring the
+    // product rather than the limiter.
+    await db.query(`DELETE FROM rate_limits`);
+  } finally {
+    await db.end();
+  }
+}
+
 export async function cleanupAccounts() {
   const db = await connect();
   try {
