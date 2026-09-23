@@ -50,9 +50,9 @@ export function ParticipantAccessControls({ disabled }: { disabled: boolean }) {
         <div className="min-w-0">
           <p className="font-display flex items-center gap-2 text-sm font-semibold">
             {disabled ? (
-              <LockKeyhole size={15} className="text-danger" />
+              <LockKeyhole size={15} className="text-danger-strong" />
             ) : (
-              <Unlock size={15} className="text-success" />
+              <Unlock size={15} className="text-success-strong" />
             )}
             Participant logins are {disabled ? "closed" : "open"}
           </p>
@@ -79,7 +79,7 @@ export function ParticipantAccessControls({ disabled }: { disabled: boolean }) {
             size="sm"
             onClick={() => setConfirming("signout")}
             disabled={pending}
-            className="hover:text-danger"
+            className="hover:text-danger-strong"
           >
             <LogOut size={14} />
             Sign everyone out

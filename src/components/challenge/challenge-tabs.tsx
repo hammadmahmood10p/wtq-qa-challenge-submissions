@@ -78,7 +78,7 @@ export function ChallengeTabs({ chosenTrack }: { chosenTrack: ChallengeTrack | n
               >
                 <span className="flex items-center gap-1.5">
                   {closed && <Lock size={11} className="shrink-0" />}
-                  {chosen && <Check size={12} className="text-success shrink-0" />}
+                  {chosen && <Check size={12} className="text-success-strong shrink-0" />}
                   <span className="font-mono text-[11px] tracking-wider">
                     Challenge {challenge.number}
                   </span>
@@ -97,7 +97,7 @@ export function ChallengeTabs({ chosenTrack }: { chosenTrack: ChallengeTrack | n
                 )}
 
                 {challenge.track === "C3" && !chosenTrack && (
-                  <span className="text-success mt-1 hidden text-[11px] font-medium lg:block">
+                  <span className="text-success-strong mt-1 hidden text-[11px] font-medium lg:block">
                     +{BONUS_DEFAULT} bonus
                   </span>
                 )}

@@ -38,6 +38,10 @@ export function RadioCards({
 }: Props) {
   return (
     <fieldset
+      // A fieldset alone cannot take aria-required or aria-invalid — axe rightly
+      // flags it. role="radiogroup" is what makes this a single required control
+      // rather than a box with radios in it, and it permits both.
+      role="radiogroup"
       aria-describedby={describedBy}
       aria-invalid={invalid || undefined}
       aria-required={required || undefined}

@@ -92,6 +92,14 @@ Both are open-source and self-hosted — **no runtime dependency on Google Fonts
 
 ### 4.1 The five signature moments
 
+> **Built on Day 11.** All five are in `src/app/globals.css` and switched off wholesale
+> by the `prefers-reduced-motion` block at the end of that file — verified by
+> re-rendering the confetti under `reducedMotion: "reduce"` and measuring a 0.01ms
+> animation. Moment 4 is a 40px arc beside the digits rather than a ring drawn around
+> them: at the size the countdown is set, a true surround reads as a border rather than
+> as progress. It depletes against the attempt's own allowance, so a reopened attempt
+> starts partly spent — which is true.
+
 Restraint is the point. Animation is spent on five moments and withheld everywhere else, so each one carries meaning.
 
 1. **The begin button.** The Aurora gradient sweeps slowly beneath "Let's begin with the challenge", the only animated element on an otherwise still page. It is the one irreversible click in the product, and it should feel like one.

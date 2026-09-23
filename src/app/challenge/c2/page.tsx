@@ -14,7 +14,10 @@ export default async function Challenge2Page() {
   const { attempt, definition, submission } = await loadChallengePage("C2");
 
   return (
-    <ChallengePageChrome remainingMs={attempt.remainingMs}>
+    <ChallengePageChrome
+      remainingMs={attempt.remainingMs}
+      totalMs={attempt.durationMinutes * 60_000}
+    >
         <header>
           <p className="text-muted font-mono text-[11px] tracking-[0.18em] uppercase">
             Challenge {definition.number}

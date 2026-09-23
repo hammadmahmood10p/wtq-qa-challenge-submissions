@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Account pending approval — WTQ 202
 export default function JudgePendingPage() {
   return (
     <div className="border-border bg-surface shadow-(--shadow-raised) rounded-(--radius-card) border p-8 text-center">
-      <span className="bg-warning/10 text-warning mx-auto flex size-12 items-center justify-center rounded-full">
+      <span className="bg-warning/10 text-warning-strong mx-auto flex size-12 items-center justify-center rounded-full">
         <Clock size={22} />
       </span>
 

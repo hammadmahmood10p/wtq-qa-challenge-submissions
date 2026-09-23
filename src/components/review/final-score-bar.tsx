@@ -35,7 +35,7 @@ export function FinalScoreBar({ judgeName }: { judgeName: string | null }) {
         {submitted ? (
           <>
             <p className="font-display flex items-center gap-2 text-sm font-semibold">
-              <CheckCircle2 size={15} className="text-success" />
+              <CheckCircle2 size={15} className="text-success-strong" />
               Final score submitted
             </p>
             <p className="text-muted mt-1 text-xs">

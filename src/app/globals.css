@@ -35,6 +35,17 @@
   --danger: #dc2626;
   --info: #4f46e5;
 
+  /* Text sitting ON a tint of its own colour — badges, alerts.
+     The base hues above are chosen against white and do not survive being put
+     on a 10% wash of themselves: #009d6d on #e6f5f0 is 3.7:1, under AA. These
+     are the same hues taken darker until they pass, so a status pill is read
+     by the colour-blind and the sunlit-laptop alike and not only by people who
+     can see the tint. Measured, not estimated — see the axe run in Day 11. */
+  --success-strong: #047857;
+  --warning-strong: #92400e;
+  --danger-strong: #b91c1c;
+  --info-strong: #3730a3;
+
   /* --- Timer ramp (DESIGN_LANGUAGE §2.4) --------------------------------
      The countdown must be readable peripherally. Every step is also paired
      with a text cue, so colour is never the only signal. */
@@ -79,6 +90,13 @@
     --danger: #f87171;
     --info: #8b83f5;
 
+    /* On a dark canvas the tint is dark too, so the readable direction is
+       lighter rather than darker — the same colours, not new ones. */
+    --success-strong: #6ee7b7;
+    --warning-strong: #fcd34d;
+    --danger-strong: #fca5a5;
+    --info-strong: #a5b4fc;
+
     --timer-calm: #a5b0ff;
     --timer-caution: #fbbf24;
     --timer-warning: #fb923c;
@@ -103,6 +121,11 @@
   --warning: #fbbf24;
   --danger: #f87171;
   --info: #8b83f5;
+
+  --success-strong: #6ee7b7;
+  --warning-strong: #fcd34d;
+  --danger-strong: #fca5a5;
+  --info-strong: #a5b4fc;
 
   --timer-calm: #a5b0ff;
   --timer-caution: #fbbf24;
@@ -135,6 +158,12 @@
   --color-warning: var(--warning);
   --color-danger: var(--danger);
   --color-info: var(--info);
+
+  /* text-success-strong and friends: for words on a wash of their own colour. */
+  --color-success-strong: var(--success-strong);
+  --color-warning-strong: var(--warning-strong);
+  --color-danger-strong: var(--danger-strong);
+  --color-info-strong: var(--info-strong);
 
   --color-timer-calm: var(--timer-calm);
   --color-timer-caution: var(--timer-caution);
@@ -182,7 +211,8 @@ body {
    locates by. The semantics come from the input's `required` attribute. */
 .required-mark::after {
   content: " *";
-  color: var(--danger);
+  /* Small text on the surface, so the darker cut — the base red is 3.9:1 here. */
+  color: var(--danger-strong);
 }
 
 /* The 10Pearls wordmark is supplied as black artwork on transparency, which
@@ -225,6 +255,88 @@ body {
   .app-gutter {
     padding-inline: 3rem;
   }
+}
+
+/* ===========================================================================
+   The five signature moments (DESIGN_LANGUAGE §4.1)
+
+   Restraint is the point. Animation is spent on five places and withheld
+   everywhere else, so each one carries meaning rather than decoration. Every
+   one of them is switched off wholesale by the reduced-motion block below.
+   =========================================================================== */
+
+/* 1. The begin button. The one irreversible click in the product, and the only
+      animated thing on an otherwise still page. The gradient drifts rather than
+      races — this should read as anticipation, not as a loading state. */
+@keyframes brand-sweep {
+  from { background-position: 0% 50%; }
+  to { background-position: 200% 50%; }
+}
+
+.brand-sweep {
+  background-size: 200% 100% !important;
+  animation: brand-sweep 6s linear infinite;
+}
+
+/* 2. The drawer cascade. A new finding expands into place and the ones below
+      settle rather than jump, which matters when a participant is adding the
+      fortieth of them. */
+@keyframes drawer-in {
+  from { opacity: 0; transform: translateY(-6px) scaleY(0.98); }
+  to { opacity: 1; transform: translateY(0) scaleY(1); }
+}
+
+.drawer-in {
+  animation: drawer-in var(--duration-standard) var(--ease-entrance) both;
+  transform-origin: top center;
+}
+
+/* 3. The save pulse. Small, frequent, and the entire basis of a participant's
+      trust that three hours of work is safe. */
+@keyframes save-pulse {
+  0% { opacity: 0; transform: scale(0.86); }
+  45% { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.save-pulse {
+  animation: save-pulse var(--duration-micro) var(--ease-entrance) both;
+}
+
+/* 4. The countdown ring. Ambient progress, readable without reading — the arc
+      is paired with the digits and the phase label, never the only signal. */
+.countdown-ring circle {
+  transition:
+    stroke-dashoffset 1s linear,
+    stroke var(--duration-standard) ease;
+}
+
+/* 5. Submission confetti. Once, at the end of three hours of effort. The last
+      thing a participant sees should feel like an achievement, not a receipt. */
+@keyframes confetti-fall {
+  from {
+    opacity: 1;
+    transform: translate3d(0, -12vh, 0) rotate(0deg);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(var(--drift, 0), 92vh, 0) rotate(var(--spin, 540deg));
+  }
+}
+
+.confetti-piece {
+  animation: confetti-fall var(--fall, 1200ms) cubic-bezier(0.2, 0.6, 0.5, 1) var(--delay, 0ms) both;
+}
+
+/* A quiet entrance for cards that appear in response to something the person
+   did, rather than on every page load. */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.rise-in {
+  animation: rise-in var(--duration-standard) var(--ease-entrance) both;
 }
 
 /* Nobody should be fighting the interface for three hours. (§4) */

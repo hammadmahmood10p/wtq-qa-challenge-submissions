@@ -42,9 +42,12 @@ const PHASE_LABEL: Record<TimerPhase, string> = {
  */
 export function ChallengeHeader({
   initialRemainingMs,
+  totalMs,
   children,
 }: {
   initialRemainingMs: number;
+  /** The attempt's full allowance, so the ring has something to deplete against. */
+  totalMs: number;
   children?: React.ReactNode;
 }) {
   const router = useRouter();
@@ -76,11 +79,46 @@ export function ChallengeHeader({
   const color = PHASE_COLOR[phase];
   const urgent = phase === "critical" || phase === "expired";
 
+  // Signature moment 4. Ambient progress — it says roughly how much of the attempt
+  // is left without anyone having to read the digits, and it is never the only
+  // signal: the number and the phase label say the same thing in words.
+  const fraction = totalMs > 0 ? Math.min(1, Math.max(0, remainingMs / totalMs)) : 0;
+  const RADIUS = 17;
+  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
   return (
     <header className="border-border bg-surface/90 sticky top-0 z-40 border-b backdrop-blur">
       <div className="app-gutter flex flex-wrap items-center justify-between gap-3 py-3">
         <div className="flex items-center gap-4">
           <WtqLogo height={30} className="hidden shrink-0 sm:block" />
+
+          <svg
+            aria-hidden="true"
+            className="countdown-ring hidden shrink-0 -rotate-90 sm:block"
+            width={40}
+            height={40}
+            viewBox="0 0 40 40"
+          >
+            <circle
+              cx={20}
+              cy={20}
+              r={RADIUS}
+              fill="none"
+              stroke="var(--border)"
+              strokeWidth={3}
+            />
+            <circle
+              cx={20}
+              cy={20}
+              r={RADIUS}
+              fill="none"
+              stroke={color}
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeDasharray={CIRCUMFERENCE}
+              strokeDashoffset={CIRCUMFERENCE * (1 - fraction)}
+            />
+          </svg>
 
           <div>
             <p className="text-muted font-mono text-[10px] tracking-[0.18em] uppercase">
@@ -124,7 +162,7 @@ export function ChallengeHeader({
       {/* The final minute is when people panic and do something destructive. The
           interface should be reassuring them, not only alarming them. */}
       {remainingMs > 0 && remainingMs <= 60_000 && (
-        <div className="bg-danger/10 text-danger border-danger/20 border-t px-4 py-2 text-center text-sm font-medium">
+        <div className="bg-danger/10 text-danger-strong border-danger/20 border-t px-4 py-2 text-center text-sm font-medium">
           <ShieldCheck size={14} className="mr-1.5 inline" />
           Less than a minute left — everything you have saved is already stored.
         </div>

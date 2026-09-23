@@ -60,7 +60,7 @@ export default function SignupChoicePage() {
                   />
                 </div>
                 <p className="text-muted mt-1.5 text-sm">{description}</p>
-                <p className="text-muted/80 mt-2.5 font-mono text-[11px] tracking-wide uppercase">
+                <p className="text-muted mt-2.5 font-mono text-[11px] tracking-wide uppercase">
                   {note}
                 </p>
               </div>

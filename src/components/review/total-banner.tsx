@@ -34,7 +34,7 @@ export function TotalBanner() {
 
       <div className="mt-2 flex justify-end">
         {submitted ? (
-          <Badge className="border-success/30 bg-success/10 text-success">Reviewed</Badge>
+          <Badge className="border-success/30 bg-success/10 text-success-strong">Reviewed</Badge>
         ) : complete ? (
           <Badge className="border-violet/30 bg-violet/10 text-violet">Ready to submit</Badge>
         ) : (

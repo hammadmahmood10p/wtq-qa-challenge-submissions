@@ -138,7 +138,7 @@ export function ChallengeScoreCard({ challenge }: { challenge: ChallengeKey }) {
             role="status"
             className={cn(
               "text-xs transition-opacity",
-              justSaved ? "text-success" : unsaved ? "text-muted" : "opacity-0",
+              justSaved ? "text-success-strong" : unsaved ? "text-muted" : "opacity-0",
             )}
           >
             {justSaved ? (

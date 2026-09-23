@@ -144,7 +144,9 @@ export default async function ChallengeBriefingPage() {
                   paused or restarted. Make sure you are settled before you begin.
                 </p>
                 <form action={beginChallenge}>
-                  <Button type="submit" variant="brand" size="lg">
+                  {/* Signature moment 1: the only animated thing on an otherwise
+                      still page, because this is the only irreversible click. */}
+                  <Button type="submit" variant="brand" size="lg" className="brand-sweep">
                     Let&apos;s begin with the challenge
                   </Button>
                 </form>

@@ -40,7 +40,7 @@ export function AnswersReadOnly({
                 {answer}
               </pre>
             ) : (
-              <p className="text-warning mt-2.5 text-sm italic">
+              <p className="text-warning-strong mt-2.5 text-sm italic">
                 {question.required ? "Not answered — this was a required question." : "Not answered."}
               </p>
             )}

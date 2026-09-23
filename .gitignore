@@ -56,3 +56,5 @@ next-env.d.ts
 
 # demo credentials — written in plain text, never committed
 /docs/DEMO_ACCOUNTS.md
+# scratch audit + diagnostic scripts (Day 11)
+*.local.mjs

@@ -69,7 +69,7 @@ export function LoginForm() {
       {/* There is no self-service reset: password resets are handled by the super
           admin (no email service). Saying so here saves a participant hunting for a
           "forgot password" link that does not exist. */}
-      <p className="text-muted/80 border-border border-t pt-4 text-center text-xs">
+      <p className="text-muted border-border border-t pt-4 text-center text-xs">
         Forgotten your password? Contact the Women Tech Quest organising team — they can
         reset it for you.
       </p>

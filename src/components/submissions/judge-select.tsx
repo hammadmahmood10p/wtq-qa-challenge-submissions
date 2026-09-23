@@ -88,7 +88,7 @@ export function JudgeSelect({
         )}
       </div>
 
-      {error && <p className="text-danger mt-1 text-xs">{error}</p>}
+      {error && <p className="text-danger-strong mt-1 text-xs">{error}</p>}
     </div>
   );
 }

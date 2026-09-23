@@ -37,7 +37,7 @@ export function AdminNav({ pendingJudges }: { pendingJudges: number }) {
               {/* The approval queue is the one thing an admin must not miss: judges
                   cannot log in until it is cleared. */}
               {href === "/admin/judges" && pendingJudges > 0 && (
-                <span className="bg-warning/15 text-warning rounded-full px-1.5 py-0.5 text-[11px] font-semibold">
+                <span className="bg-warning/15 text-warning-strong rounded-full px-1.5 py-0.5 text-[11px] font-semibold">
                   {pendingJudges}
                 </span>
               )}

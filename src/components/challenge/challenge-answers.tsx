@@ -7,6 +7,7 @@ import { Alert } from "@/components/ui/alert";
 import { inputClasses } from "@/components/ui/field";
 import type { ChallengeKey } from "@/generated/prisma/enums";
 import type { ChallengeQuestion } from "@/lib/challenge-content";
+import { retrySave, type RetryHandle } from "@/lib/retry-save";
 import { cn } from "@/lib/utils";
 import { SaveIndicator, type SaveState } from "./save-indicator";
 
@@ -43,6 +44,7 @@ export function ChallengeAnswers({
   const [error, setError] = useState<string | null>(null);
 
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const retries = useRef(new Map<string, RetryHandle>());
   const pending = useRef(new Map<string, string>());
 
   useEffect(() => {
@@ -59,23 +61,52 @@ export function ChallengeAnswers({
       clearTimeout(timers.current.get(key));
       timers.current.delete(key);
 
+      // A newer edit supersedes anything still retrying for this question.
+      retries.current.get(key)?.cancel();
+      retries.current.delete(key);
+
       setStates((prev) => ({ ...prev, [key]: "saving" }));
-      const result = await saveChallengeAnswer(challenge, key, value);
 
-      if (result.closed) {
-        router.refresh();
-        return;
-      }
+      let closed = false;
+      let refused: string | null = null;
 
-      if (!result.ok) {
-        setStates((prev) => ({ ...prev, [key]: "error" }));
-        setError(result.error ?? "Could not save. Please try again.");
-        pending.current.set(key, value);
-        return;
-      }
+      retries.current.set(
+        key,
+        retrySave({
+          attempt: async () => {
+            const result = await saveChallengeAnswer(challenge, key, value);
 
-      setStates((prev) => ({ ...prev, [key]: "saved" }));
-      setError(null);
+            if (result.closed) closed = true;
+            else if (!result.ok) refused = result.error ?? "Could not save. Please try again.";
+
+            // Answered either way, so the matter is settled. Only an unreachable
+            // server — which throws — is worth repeating.
+            return true;
+          },
+          onSettled: () => {
+            retries.current.delete(key);
+
+            if (closed) {
+              router.refresh();
+              return;
+            }
+
+            if (refused) {
+              setStates((prev) => ({ ...prev, [key]: "error" }));
+              setError(refused);
+              pending.current.set(key, value);
+              return;
+            }
+
+            setStates((prev) => ({ ...prev, [key]: "saved" }));
+            setError(null);
+          },
+          onRetryScheduled: () => {
+            setStates((prev) => ({ ...prev, [key]: "retrying" }));
+            pending.current.set(key, value);
+          },
+        }),
+      );
     },
     [challenge, router],
   );
@@ -138,7 +169,7 @@ export function ChallengeAnswers({
 
               <div className="flex items-baseline justify-between gap-2">
                 {empty ? (
-                  <p className="text-warning text-xs">This answer is required.</p>
+                  <p className="text-warning-strong text-xs">This answer is required.</p>
                 ) : (
                   <span />
                 )}

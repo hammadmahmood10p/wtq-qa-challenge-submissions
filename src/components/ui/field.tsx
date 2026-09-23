@@ -48,7 +48,7 @@ export function Field({ label, error, hint, required, children }: FieldProps) {
       )}
 
       {error && (
-        <p id={errorId} role="alert" className="text-danger flex items-center gap-1.5 text-xs">
+        <p id={errorId} role="alert" className="text-danger-strong flex items-center gap-1.5 text-xs">
           <AlertCircle size={13} className="shrink-0" />
           {error}
         </p>

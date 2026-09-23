@@ -196,7 +196,7 @@ export function RowActions({
               onClick={() => request("restart")}
               disabled={pending}
               title="Clear their work and let them start again"
-              className="hover:text-danger"
+              className="hover:text-danger-strong"
             >
               <Eraser size={14} />
               <span className="sr-only">Clear {fullName}&apos;s attempt and restart</span>
@@ -248,7 +248,7 @@ export function RowActions({
             onClick={() => request("remove")}
             disabled={pending}
             title="Remove"
-            className="hover:text-danger"
+            className="hover:text-danger-strong"
           >
             <Trash2 size={14} />
             <span className="sr-only">Remove {fullName}</span>
@@ -318,7 +318,7 @@ export function RowActions({
           </div>
 
           {attempt && attempt.reopenCount > 0 && (
-            <p className="text-warning text-xs">
+            <p className="text-warning-strong text-xs">
               This attempt has already been reopened {attempt.reopenCount} time(s).
             </p>
           )}

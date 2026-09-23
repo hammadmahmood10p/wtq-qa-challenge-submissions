@@ -107,7 +107,10 @@ export function EntryDrawer({
   return (
     <div
       className={cn(
-        "border-border bg-surface rounded-(--radius-card) border transition-colors",
+        // Signature moment 2: a new finding expands into place rather than
+        // appearing, and the ones below it settle rather than jumping. It matters
+        // most at the fortieth, which is where this screen actually gets used.
+        "border-border bg-surface drawer-in rounded-(--radius-card) border transition-colors",
         expanded && "border-violet/40",
       )}
     >
@@ -298,7 +301,7 @@ export function EntryDrawer({
                   variant="ghost"
                   onClick={() => setConfirmingDelete(true)}
                   disabled={disabled}
-                  className="hover:text-danger"
+                  className="hover:text-danger-strong"
                 >
                   <Trash2 size={14} />
                   Delete

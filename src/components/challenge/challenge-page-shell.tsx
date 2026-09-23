@@ -31,14 +31,16 @@ export async function loadChallengePage(challenge: ChallengeKey) {
 
 export function ChallengePageChrome({
   remainingMs,
+  totalMs,
   children,
 }: {
   remainingMs: number;
+  totalMs: number;
   children: React.ReactNode;
 }) {
   return (
     <>
-      <ChallengeHeader initialRemainingMs={remainingMs}>
+      <ChallengeHeader initialRemainingMs={remainingMs} totalMs={totalMs}>
         <SubmitButton />
       </ChallengeHeader>
       <main className="app-gutter space-y-8 py-8">{children}</main>

@@ -102,7 +102,7 @@ export default async function ParticipantsPage({
                   {/* An attempt handed back reads as ACTIVE, which on its own hides the
                       fact that a submission is currently withheld from judging. */}
                   {row.attempt?.reopenedAt && (
-                    <span className="text-warning mt-1 block text-[11px]">
+                    <span className="text-warning-strong mt-1 block text-[11px]">
                       Reopened — awaiting resubmission
                     </span>
                   )}

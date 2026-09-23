@@ -83,11 +83,15 @@ export function EvidenceStrip({
           {busy ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
           Attach evidence
         </button>
-        <span className="text-muted/70 text-[11px]">or paste a screenshot into the box above</span>
+        <span className="text-muted text-[11px]">or paste a screenshot into the box above</span>
 
         <input
           ref={inputRef}
           type="file"
+          // Hidden from sight but not from the accessibility tree: it is the
+          // control the visible button opens, and an unnamed file input is what
+          // a screen reader lands on if it reaches this by any other route.
+          aria-label="Attach a screenshot as evidence"
           accept="image/png,image/jpeg,image/gif,image/webp"
           className="sr-only"
           onChange={(e) => {

@@ -101,7 +101,7 @@ export function Challenge3ReadOnly({
         private, renamed, or simply that GitHub rate-limited us.
       */}
       {submission.verifiedPublic === false && (
-        <p className="text-warning flex items-center gap-1.5 text-xs">
+        <p className="text-warning-strong flex items-center gap-1.5 text-xs">
           <AlertTriangle size={13} />
           This repository was not reachable when the participant saved it.
         </p>

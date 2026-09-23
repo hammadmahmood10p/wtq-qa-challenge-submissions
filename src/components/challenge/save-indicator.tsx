@@ -3,13 +3,19 @@
 import { AlertCircle, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
+export type SaveState = "idle" | "dirty" | "saving" | "saved" | "retrying" | "error";
 
+/**
+ * "Not saved" is reserved for a save the server refused, which is the only kind the
+ * participant can do anything about. A save that could not reach the server says so
+ * differently, because it is still going to happen.
+ */
 const LABELS: Record<SaveState, string> = {
   idle: "",
   dirty: "Unsaved changes",
   saving: "Saving…",
   saved: "Saved",
+  retrying: "Reconnecting — your work is kept",
   error: "Not saved",
 };
 
@@ -25,10 +31,12 @@ export function SaveIndicator({ state, className }: { state: SaveState; classNam
 
   const color =
     state === "error"
-      ? "text-danger"
-      : state === "saved"
-        ? "text-success"
-        : "text-muted";
+      ? "text-danger-strong"
+      : state === "retrying"
+        ? "text-warning-strong"
+        : state === "saved"
+          ? "text-success-strong"
+          : "text-muted";
 
   return (
     <span
@@ -36,8 +44,12 @@ export function SaveIndicator({ state, className }: { state: SaveState; classNam
       aria-live="polite"
       className={cn("flex items-center gap-1.5 text-xs", color, className)}
     >
-      {state === "saving" && <Loader2 size={12} className="animate-spin" />}
-      {state === "saved" && <Check size={12} />}
+      {(state === "saving" || state === "retrying") && (
+        <Loader2 size={12} className="animate-spin" />
+      )}
+      {/* Keyed on the state so React remounts the tick and the animation runs
+          again on every save, rather than only the first. */}
+      {state === "saved" && <Check key="saved" size={12} className="save-pulse" />}
       {state === "error" && <AlertCircle size={12} />}
       {LABELS[state]}
     </span>

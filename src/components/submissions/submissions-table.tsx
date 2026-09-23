@@ -76,7 +76,7 @@ export function SubmissionsTable({
 
               <Td className="whitespace-nowrap">
                 {row.reviewed ? (
-                  <Badge className="border-success/30 bg-success/10 text-success">Reviewed</Badge>
+                  <Badge className="border-success/30 bg-success/10 text-success-strong">Reviewed</Badge>
                 ) : (
                   <Badge>Not reviewed</Badge>
                 )}

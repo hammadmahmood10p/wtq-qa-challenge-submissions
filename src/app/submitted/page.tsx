@@ -1,6 +1,7 @@
 import { CheckCircle2, Clock } from "lucide-react";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { Confetti } from "@/components/challenge/confetti";
 
 export const metadata: Metadata = { title: "Submitted — WTQ 2026" };
 
@@ -32,10 +33,14 @@ export default async function SubmittedPage({
         style={{ background: "var(--brand-gradient)" }}
       />
 
-      <div className="border-border bg-surface shadow-(--shadow-raised) relative w-full max-w-md rounded-(--radius-card) border p-8 text-center">
+      {/* Only for a finished submission. Running out of time is a completion too,
+          but it is not an achievement and should not be dressed as one. */}
+      {!expired && <Confetti />}
+
+      <div className="border-border bg-surface shadow-(--shadow-raised) rise-in relative w-full max-w-md rounded-(--radius-card) border p-8 text-center">
         <span
           className={`mx-auto flex size-14 items-center justify-center rounded-full ${
-            expired ? "bg-warning/10 text-warning" : "bg-success/10 text-success"
+            expired ? "bg-warning/10 text-warning-strong" : "bg-success/10 text-success-strong"
           }`}
         >
           {expired ? <Clock size={26} /> : <CheckCircle2 size={26} />}

@@ -12,7 +12,13 @@ export function TableShell({ children, className }: { children: React.ReactNode;
   return (
     <div
       className={cn(
-        "border-border bg-surface shadow-(--shadow-card) overflow-x-auto rounded-(--radius-card) border",
+        // `relative` is load-bearing, not decoration. Without a positioned ancestor,
+        // any `position: absolute` descendant — and `sr-only` is one — resolves
+        // against the initial containing block, escapes this scroll container, and
+        // drags the page's own scrollbar out to the table's full width. On a phone
+        // that is 600px of blank canvas you can swipe into, on a table whose columns
+        // were supposed to scroll inside this box.
+        "border-border bg-surface shadow-(--shadow-card) relative overflow-x-auto rounded-(--radius-card) border",
         className,
       )}
     >

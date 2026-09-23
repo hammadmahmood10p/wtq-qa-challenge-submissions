@@ -1,10 +1,15 @@
 import { cn } from "@/lib/utils";
 
+/**
+ * The wash stays in the base colour; the word is a darker cut of it.
+ * A pill's text is small, and the base hues were chosen against white — on a
+ * 10% tint of themselves they fall under AA.
+ */
 const STATUS_STYLES: Record<string, string> = {
-  ACTIVE: "border-success/30 bg-success/10 text-success",
-  PENDING_APPROVAL: "border-warning/30 bg-warning/10 text-warning",
-  BLOCKED: "border-danger/30 bg-danger/10 text-danger",
-  SUBMITTED_LOCKED: "border-violet/30 bg-violet/10 text-violet",
+  ACTIVE: "border-success/30 bg-success/10 text-success-strong",
+  PENDING_APPROVAL: "border-warning/30 bg-warning/10 text-warning-strong",
+  BLOCKED: "border-danger/30 bg-danger/10 text-danger-strong",
+  SUBMITTED_LOCKED: "border-violet/30 bg-violet/10 text-info-strong",
   REMOVED: "border-border bg-surface-raised text-muted",
 };
 

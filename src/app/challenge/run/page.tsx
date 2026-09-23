@@ -24,7 +24,10 @@ export default async function ChallengeRunPage() {
 
   return (
     <>
-      <ChallengeHeader initialRemainingMs={attempt.remainingMs}>
+      <ChallengeHeader
+        initialRemainingMs={attempt.remainingMs}
+        totalMs={attempt.durationMinutes * 60_000}
+      >
         <SubmitButton />
       </ChallengeHeader>
 

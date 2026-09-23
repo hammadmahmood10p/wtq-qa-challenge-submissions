@@ -41,7 +41,7 @@ export function TrackChoice({
 
   if (isChosen) {
     return (
-      <p className="text-success flex items-center gap-1.5 text-sm font-medium">
+      <p className="text-success-strong flex items-center gap-1.5 text-sm font-medium">
         <Check size={15} />
         You chose this challenge.
       </p>

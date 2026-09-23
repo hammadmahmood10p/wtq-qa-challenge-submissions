@@ -12,6 +12,7 @@ import {
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { MAX_ENTRIES } from "@/lib/challenge1-limits";
+import { retrySave, type RetryHandle } from "@/lib/retry-save";
 import { EntryDrawer, type DrawerEntry } from "./entry-drawer";
 import type { Evidence } from "./evidence-strip";
 import type { SaveState } from "./save-indicator";
@@ -43,6 +44,8 @@ export function Challenge1Workspace({ initialEntries }: { initialEntries: Drawer
   const [busy, setBusy] = useState(false);
 
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  /** In-flight retries, one per entry, so a newer edit can cancel an older save. */
+  const retries = useRef(new Map<string, RetryHandle>());
   const pending = useRef(new Map<string, DrawerEntry>());
 
   useEffect(() => {
@@ -65,25 +68,61 @@ export function Challenge1Workspace({ initialEntries }: { initialEntries: Drawer
       clearTimeout(timers.current.get(id));
       timers.current.delete(id);
 
+      // A newer edit to this entry supersedes anything still retrying for it,
+      // otherwise a stale retry could land last and undo the newer text.
+      retries.current.get(id)?.cancel();
+      retries.current.delete(id);
+
       setSaveState(id, "saving");
-      const result = await updateEntry(id, {
-        bugTitle: draft.bugTitle,
-        bugDescription: draft.bugDescription,
-        testTitle: draft.testTitle,
-        testDescription: draft.testDescription,
+
+      let closed = false;
+      let refused: string | null = null;
+
+      const handle = retrySave({
+        attempt: async () => {
+          const result = await updateEntry(id, {
+            bugTitle: draft.bugTitle,
+            bugDescription: draft.bugDescription,
+            testTitle: draft.testTitle,
+            testDescription: draft.testDescription,
+          });
+
+          if (result.closed) {
+            closed = true;
+            return true; // stop retrying; the attempt is over
+          }
+
+          // The server answered and said no. Repeating it would get the same
+          // answer, so this is a real error rather than something to wait out.
+          if (!result.ok) {
+            refused = result.error ?? "Could not save. Please try again.";
+            return true;
+          }
+
+          return true;
+        },
+        onSettled: () => {
+          retries.current.delete(id);
+
+          if (closed) return onClosed();
+
+          if (refused) {
+            setSaveState(id, "error");
+            setError(refused);
+            pending.current.set(id, draft); // so the save button can retry it
+            return;
+          }
+
+          setSaveState(id, "saved");
+          setError(null);
+        },
+        onRetryScheduled: () => {
+          setSaveState(id, "retrying");
+          pending.current.set(id, draft);
+        },
       });
 
-      if (result.closed) return onClosed();
-
-      if (!result.ok) {
-        setSaveState(id, "error");
-        setError(result.error ?? "Could not save. Please try again.");
-        pending.current.set(id, draft); // so the save button can retry it
-        return;
-      }
-
-      setSaveState(id, "saved");
-      setError(null);
+      retries.current.set(id, handle);
     },
     [onClosed, setSaveState],
   );
