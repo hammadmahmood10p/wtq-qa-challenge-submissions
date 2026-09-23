@@ -15,7 +15,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-dvh">
       <AppHeader user={user} />
       <AdminNav pendingJudges={counts.judgesPending} />
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">{children}</main>
+      <main className="app-gutter py-8">{children}</main>
     </div>
   );
 }

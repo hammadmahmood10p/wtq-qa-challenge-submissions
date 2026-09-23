@@ -106,50 +106,52 @@ export function ChallengeAnswers({
 
       {error && <Alert variant="error">{error}</Alert>}
 
-      {questions.map((question) => {
-        const value = answers[question.key] ?? "";
-        const empty = question.required && !value.trim();
+      <div className="grid gap-6 xl:grid-cols-2">
+        {questions.map((question) => {
+          const value = answers[question.key] ?? "";
+          const empty = question.required && !value.trim();
 
-        return (
-          <div key={question.key} className="space-y-1.5">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <label
-                htmlFor={`q-${question.key}`}
-                className={cn("block text-sm font-medium", question.required && "required-mark")}
-              >
-                {question.label}
-              </label>
-              <SaveIndicator state={states[question.key] ?? "idle"} />
+          return (
+            <div key={question.key} className="space-y-1.5">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <label
+                  htmlFor={`q-${question.key}`}
+                  className={cn("block text-sm font-medium", question.required && "required-mark")}
+                >
+                  {question.label}
+                </label>
+                <SaveIndicator state={states[question.key] ?? "idle"} />
+              </div>
+
+              {question.hint && <p className="text-muted text-xs">{question.hint}</p>}
+
+              <textarea
+                id={`q-${question.key}`}
+                value={value}
+                onChange={(e) => onChange(question.key, e.target.value)}
+                onBlur={() => void flush(question.key)}
+                maxLength={question.maxLength}
+                rows={question.rows}
+                placeholder={question.placeholder}
+                className={cn(inputClasses(), "resize-y text-[13px] leading-relaxed")}
+              />
+
+              <div className="flex items-baseline justify-between gap-2">
+                {empty ? (
+                  <p className="text-warning text-xs">This answer is required.</p>
+                ) : (
+                  <span />
+                )}
+                {value.length > question.maxLength * 0.8 && (
+                  <span className="text-muted text-xs tabular-nums">
+                    {value.length.toLocaleString()} / {question.maxLength.toLocaleString()}
+                  </span>
+                )}
+              </div>
             </div>
-
-            {question.hint && <p className="text-muted text-xs">{question.hint}</p>}
-
-            <textarea
-              id={`q-${question.key}`}
-              value={value}
-              onChange={(e) => onChange(question.key, e.target.value)}
-              onBlur={() => void flush(question.key)}
-              maxLength={question.maxLength}
-              rows={question.rows}
-              placeholder={question.placeholder}
-              className={cn(inputClasses(), "resize-y text-[13px] leading-relaxed")}
-            />
-
-            <div className="flex items-baseline justify-between gap-2">
-              {empty ? (
-                <p className="text-warning text-xs">This answer is required.</p>
-              ) : (
-                <span />
-              )}
-              {value.length > question.maxLength * 0.8 && (
-                <span className="text-muted text-xs tabular-nums">
-                  {value.length.toLocaleString()} / {question.maxLength.toLocaleString()}
-                </span>
-              )}
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </section>
   );
 }

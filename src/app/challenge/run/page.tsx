@@ -28,7 +28,7 @@ export default async function ChallengeRunPage() {
         <SubmitButton />
       </ChallengeHeader>
 
-      <main className="mx-auto max-w-4xl px-4 pb-16 sm:px-6">
+      <main className="app-gutter pb-16">
         <ChallengeTabs chosenTrack={attempt.chosenTrack} />
       </main>
     </>

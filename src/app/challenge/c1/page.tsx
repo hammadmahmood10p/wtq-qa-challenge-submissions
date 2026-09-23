@@ -16,7 +16,7 @@ export default async function Challenge1Page() {
   const entries = await listChallenge1Entries(attempt.id);
 
   return (
-    <ChallengePageChrome remainingMs={attempt.remainingMs} wide>
+    <ChallengePageChrome remainingMs={attempt.remainingMs}>
       <header>
         <p className="text-muted font-mono text-[11px] tracking-[0.18em] uppercase">
           Challenge {definition.number}

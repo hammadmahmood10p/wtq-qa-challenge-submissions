@@ -69,7 +69,7 @@ export function ChallengeHeader({
 
   return (
     <header className="border-border bg-surface/90 sticky top-0 z-40 border-b backdrop-blur">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+      <div className="app-gutter flex flex-wrap items-center justify-between gap-3 py-3">
         <div className="flex items-center gap-4">
           <WtqLogo height={30} className="hidden shrink-0 sm:block" />
 

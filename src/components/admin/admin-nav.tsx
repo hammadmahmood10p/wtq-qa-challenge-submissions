@@ -17,7 +17,7 @@ export function AdminNav({ pendingJudges }: { pendingJudges: number }) {
 
   return (
     <nav aria-label="Admin sections" className="border-border border-b">
-      <div className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 sm:px-6">
+      <div className="app-gutter flex gap-1 overflow-x-auto">
         {LINKS.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
 

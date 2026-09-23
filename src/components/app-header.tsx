@@ -12,7 +12,7 @@ const ROLE_LABELS: Record<SessionUser["role"], string> = {
 export function AppHeader({ user }: { user: SessionUser }) {
   return (
     <header className="border-border bg-surface/90 sticky top-0 z-40 border-b backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+      <div className="app-gutter flex items-center justify-between gap-4 py-3">
         <div className="flex min-w-0 items-center gap-4">
           <BrandLockup height={30} className="shrink-0" />
 

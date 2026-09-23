@@ -19,7 +19,7 @@ it is marked *post-event*.
 | ~~**P5**~~ | ~~Score scale~~ | `src/lib/scoring.ts` | **Closed.** The organisers supplied the full rubric: ten criteria across four challenges, plus a +5 bonus for choosing Challenge 3 that a judge may adjust to −5 |
 | **P6** | **Judging model** — how many judges, and whether every submission gets a full review or only a shortlist | Assignment logic on Day 8 | An event-design decision. ~1000 submissions reviewed in one afternoon may not be physically possible; see §3.4 |
 | **P7** | **Branding** — palette now aligned with the WTQ26 Learning Portal | `src/app/globals.css`, visible at `/design-preview` | Done. Indigo primary, lavender surfaces, deep-navy panels, with periwinkle/gold/green taken from the event mark |
-| **P8** | **The 10Pearls logo as an SVG** | Drop it at `public/10pearls-logo.svg`; `TenPearlsLogo` in `src/components/brand/logos.tsx` is one line to switch over | Currently drawn as type. Hand-drawing it from a screenshot would produce something subtly wrong, which is worse than an honest wordmark |
+| ~~**P8**~~ | ~~The official 10Pearls logo~~ | `public/10pearls-logo.webp`, used by `TenPearlsLogo` | **Closed.** The organisers supplied the official mark, replacing the type wordmark that stood in for it. Single colour on transparency, so dark mode inverts it rather than needing a second file. An SVG would still be preferable if one turns up |
 
 ---
 
@@ -44,6 +44,7 @@ it is marked *post-event*.
 | **T3** | GitHub reachability check is best-effort and unauthenticated | Rate limits and outages must never cost a participant their submission, so it warns rather than blocks |
 | **T4** | No offline retry queue for autosave | Deferred to the Day 11 polish pass. A failed save shows an error and can be retried with the entry's own save button, so nothing is lost silently — but a participant on a dropping connection currently has to notice and press it |
 | **T5** | Cross-tab closure uses BroadcastChannel, which is same-browser only | Correct for the scenario in the brief (several tabs, one machine). A second *device* would notice at the next status poll instead, within a minute. Not worth a server-push channel for this event |
+| **T6** | `lucide-react@1.47.0` renders icon paths without React keys | A defect in the library, not in our code: its `Icon` forwardRef maps `iconNode` straight to `createElement` with no key, so every page with an icon logs a key warning in development. Cosmetic — it costs a little reconciliation work and nothing else. Not worth a dependency bump this close to the event |
 
 ---
 

@@ -10,16 +10,26 @@ import { cn } from "@/lib/utils";
  * when the width and height attributes were being overridden by `w-auto h-auto`.
  */
 
-/** The cropped viewBox in public/wtq-logo.svg: 203 × 125, artwork only. */
-const WTQ_ASPECT = 203 / 125;
+/**
+ * The assets' own dimensions — the cropped viewBox in public/wtq-logo.svg, and the
+ * supplied 10Pearls file.
+ *
+ * These are passed to next/image as-is rather than scaled to the display size. The
+ * component compares the rendered box against these numbers to decide whether the
+ * aspect ratio has been broken, and a rounded display width fails that check by a
+ * fraction of a pixel. Giving it the true intrinsic size and sizing in CSS is the
+ * combination it is actually expecting.
+ */
+const WTQ_INTRINSIC = { width: 203, height: 125 };
+const TENPEARLS_INTRINSIC = { width: 652, height: 200 };
 
 export function WtqLogo({ height = 34, className }: { height?: number; className?: string }) {
   return (
     <Image
       src="/wtq-logo.svg"
       alt="Women Tech Quest"
-      width={Math.round(height * WTQ_ASPECT)}
-      height={height}
+      width={WTQ_INTRINSIC.width}
+      height={WTQ_INTRINSIC.height}
       // Height is the constraint; width follows from the aspect ratio. Set in style
       // rather than as classes so nothing passed in can quietly override the size.
       style={{ height, width: "auto" }}
@@ -30,31 +40,32 @@ export function WtqLogo({ height = 34, className }: { height?: number; className
 }
 
 /**
- * The 10Pearls wordmark.
+ * The official 10Pearls wordmark.
  *
- * Drawn as type until the real asset arrives — dropping it in at
- * public/10pearls-logo.svg is a one-line change here. Hand-drawing someone else's logo
- * from a screenshot would produce something subtly wrong, which is worse than an honest
- * wordmark. See P8 in docs/PENDING.md.
+ * The asset is a single colour on transparency, so dark mode is a straight inversion
+ * of it — black artwork becomes white and the transparency is untouched. That is
+ * `.logo-invert-on-dark` in globals.css, which knows about the manual theme override
+ * as well as the system preference.
  *
- * `fontSize` is roughly the cap height to match against, so a caller sizing the pair
- * together has one number for each.
+ * Sized by height to match WtqLogo, so a caller placing the pair has one number.
  */
 export function TenPearlsLogo({
-  fontSize = 16,
+  height = 16,
   className,
 }: {
-  fontSize?: number;
+  height?: number;
   className?: string;
 }) {
   return (
-    <span
-      className={cn("font-display leading-none font-bold tracking-tight whitespace-nowrap", className)}
-      style={{ fontSize }}
-      aria-label="10Pearls"
-    >
-      10<span className="font-semibold">Pearls</span>
-    </span>
+    <Image
+      src="/10pearls-logo.webp"
+      alt="10Pearls"
+      width={TENPEARLS_INTRINSIC.width}
+      height={TENPEARLS_INTRINSIC.height}
+      style={{ height, width: "auto" }}
+      className={cn("logo-invert-on-dark", className)}
+      priority
+    />
   );
 }
 
@@ -62,8 +73,7 @@ export function TenPearlsLogo({
  * Both marks together, divided by a hairline.
  *
  * 10Pearls first and the event mark second: the company runs the event, and the order
- * says so without either competing. The wordmark is set at roughly half the lockup's
- * height, which is what makes them read as equals rather than one shouting.
+ * says so without either competing.
  */
 export function BrandLockup({
   height = 34,
@@ -72,15 +82,15 @@ export function BrandLockup({
   height?: number;
   className?: string;
 }) {
-  // The lockup stacks three lines of type, so it carries far more visual weight than
-  // a single wordmark of the same height. A third of its height is what makes the two
-  // read as equals; the floor keeps the wordmark legible in a header, where a strict
-  // ratio would shrink it to nothing.
-  const wordmark = Math.max(14, Math.round(height * 0.33));
+  // The WTQ lockup stacks three lines of type, so it carries far more visual weight
+  // than a single-line wordmark of the same height. Roughly half is what makes the two
+  // read as equals. The floor matters more than the ratio at header sizes: below about
+  // 18px the counter inside the "0" closes up and the mark reads as a blob.
+  const wordmark = Math.max(18, Math.round(height * 0.46));
 
   return (
     <span className={cn("flex items-center", className)} style={{ gap: height * 0.38 }}>
-      <TenPearlsLogo fontSize={wordmark} />
+      <TenPearlsLogo height={wordmark} />
       <span
         aria-hidden="true"
         className="bg-border w-px shrink-0"

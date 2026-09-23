@@ -7,7 +7,6 @@ import { getAttempt } from "@/lib/attempt";
 import { requireRole } from "@/lib/auth";
 import { challengeById, isChallengeOpen } from "@/lib/challenge-content";
 import { getSubmission } from "@/lib/challenge-submissions";
-import { cn } from "@/lib/utils";
 
 /**
  * The shared guard and chrome for every challenge submission page.
@@ -32,12 +31,9 @@ export async function loadChallengePage(challenge: ChallengeKey) {
 
 export function ChallengePageChrome({
   remainingMs,
-  wide,
   children,
 }: {
   remainingMs: number;
-  /** Challenge 1 holds two columns and needs the room. */
-  wide?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -45,9 +41,7 @@ export function ChallengePageChrome({
       <ChallengeHeader initialRemainingMs={remainingMs}>
         <SubmitButton />
       </ChallengeHeader>
-      <main className={cn("mx-auto space-y-8 px-4 py-8 sm:px-6", wide ? "max-w-5xl" : "max-w-3xl")}>
-        {children}
-      </main>
+      <main className="app-gutter space-y-8 py-8">{children}</main>
     </>
   );
 }

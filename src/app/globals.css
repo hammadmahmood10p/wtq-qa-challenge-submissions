@@ -185,6 +185,48 @@ body {
   color: var(--danger);
 }
 
+/* The 10Pearls wordmark is supplied as black artwork on transparency, which
+   disappears against the dark canvas. A straight inversion turns it white and
+   leaves the transparency alone — correct here precisely because the mark is a
+   single colour, and not something to reach for with a coloured logo. Both the
+   system preference and the manual override are handled, matching the two
+   theme blocks above. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .logo-invert-on-dark {
+    filter: invert(1);
+  }
+}
+
+:root[data-theme="dark"] .logo-invert-on-dark {
+  filter: invert(1);
+}
+
+/* The shared page gutter for every signed-in screen.
+   Full-bleed with room to breathe at the edges, and one definition so the
+   header's marks line up with the content beneath them. */
+.app-gutter {
+  width: 100%;
+  padding-inline: 1rem;
+}
+
+@media (min-width: 640px) {
+  .app-gutter {
+    padding-inline: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-gutter {
+    padding-inline: 2rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .app-gutter {
+    padding-inline: 3rem;
+  }
+}
+
 /* Nobody should be fighting the interface for three hours. (§4) */
 @media (prefers-reduced-motion: reduce) {
   *,
