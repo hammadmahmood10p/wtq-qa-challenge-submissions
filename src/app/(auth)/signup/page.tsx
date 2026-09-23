@@ -18,7 +18,7 @@ const ROLES = [
     icon: Users,
     title: "Register as a Participant",
     description:
-      "Take on the three QA challenges. Sign up with the ID card number, email and phone you registered with.",
+      "Take on the QA challenges. Sign up with the ID card number, email and phone you registered with.",
     note: "Ready to log in straight away",
   },
   {

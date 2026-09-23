@@ -18,7 +18,7 @@ export default function JudgeSignupPage() {
 
       <h1 className="font-display text-xl font-bold">Register as a Judge</h1>
       <p className="text-muted mt-1.5 mb-7 text-sm">
-        Judges evaluate and score participant submissions across the three challenges.
+        Judges evaluate and score participant submissions across every challenge.
       </p>
 
       <JudgeForm />

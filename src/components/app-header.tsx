@@ -14,7 +14,7 @@ export function AppHeader({ user }: { user: SessionUser }) {
     <header className="border-border bg-surface/90 sticky top-0 z-40 border-b backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-4">
-          <BrandLockup wtqSize={36} className="shrink-0" />
+          <BrandLockup height={30} className="shrink-0" />
 
           <span
             aria-hidden="true"

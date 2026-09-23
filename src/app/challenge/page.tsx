@@ -14,9 +14,10 @@ export const metadata: Metadata = { title: "Challenge briefing — WTQ 2026" };
 function formatDuration(minutes: number): string {
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
-  if (hours && rest) return ` hours  minutes`;
-  if (hours) return hours === 1 ? "1 hour" : ` hours`;
-  return ` minutes`;
+
+  if (hours && rest) return `${hours} hours ${rest} minutes`;
+  if (hours) return hours === 1 ? "1 hour" : `${hours} hours`;
+  return `${rest} minutes`;
 }
 
 /**
@@ -83,8 +84,9 @@ export default async function ChallengeBriefingPage() {
           <li className="flex gap-2.5">
             <FileText size={15} className="text-violet mt-0.5 shrink-0" />
             <span>
-              There are three challenges. You can work on them in any order, and move
-              between them as often as you like.
+              There are four challenges. Challenges 1 and 2 are for everyone; Challenges
+              3 and 4 are alternatives, so you choose one of those two. You can work in
+              any order and move between them as often as you like.
             </span>
           </li>
           <li className="flex gap-2.5">
