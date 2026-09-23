@@ -1,5 +1,6 @@
 import { cache } from "react";
 import type { Attempt } from "@/generated/prisma/client";
+import type { ChallengeTrack } from "@/generated/prisma/enums";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 
@@ -22,6 +23,7 @@ export interface AttemptView {
   submittedAt: Date | null;
   autoSubmitted: boolean;
   durationMinutes: number;
+  chosenTrack: ChallengeTrack | null;
   /** Server time at the moment this was read, so the client can correct its own clock. */
   serverNow: Date;
   remainingMs: number;
@@ -118,6 +120,7 @@ export const getAttempt = cache(async (participantId: string): Promise<AttemptVi
     submittedAt: attempt.submittedAt,
     autoSubmitted: attempt.autoSubmitted,
     durationMinutes: attempt.durationMinutes,
+    chosenTrack: attempt.chosenTrack,
     serverNow,
     remainingMs: attempt.endsAt ? Math.max(0, attempt.endsAt.getTime() - serverNow.getTime()) : 0,
   };

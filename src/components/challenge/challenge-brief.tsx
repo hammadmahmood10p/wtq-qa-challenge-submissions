@@ -1,19 +1,29 @@
-import { ExternalLink, Sparkles } from "lucide-react";
-import type { Challenge } from "@/lib/challenge-content";
+import { ExternalLink, Lock, Sparkles } from "lucide-react";
+import type { ChallengeTrack } from "@/generated/prisma/enums";
 import { Alert } from "@/components/ui/alert";
+import type { Challenge } from "@/lib/challenge-content";
+import { isChallengeOpen } from "@/lib/challenge-content";
 
 /**
- * One challenge briefing. Shared by the information page and the workspace tabs so
- * the wording a participant reads before starting is exactly the wording they can
- * check halfway through.
+ * One challenge briefing. Shared by the information page and the workspace tabs, so
+ * the wording a participant reads before starting is the wording they can check
+ * halfway through.
  */
 export function ChallengeBrief({
   challenge,
   showSubmitLink,
+  chosenTrack,
+  choiceControl,
 }: {
   challenge: Challenge;
   showSubmitLink?: boolean;
+  chosenTrack?: ChallengeTrack | null;
+  /** The "choose this challenge" control, for the two alternatives. */
+  choiceControl?: React.ReactNode;
 }) {
+  const open = isChallengeOpen(challenge, chosenTrack ?? null);
+  const closedByChoice = Boolean(challenge.track && chosenTrack && !open);
+
   return (
     <article className="space-y-6">
       <header>
@@ -23,6 +33,15 @@ export function ChallengeBrief({
         <h2 className="font-display mt-1.5 text-xl font-bold sm:text-2xl">{challenge.title}</h2>
         <p className="text-muted mt-2 max-w-2xl">{challenge.summary}</p>
       </header>
+
+      {closedByChoice && (
+        <Alert variant="info" title="This challenge is closed to you">
+          <span className="flex items-center gap-1.5">
+            <Lock size={13} />
+            You chose Challenge {chosenTrack === "C3" ? 3 : 4}, and that cannot be changed.
+          </span>
+        </Alert>
+      )}
 
       {challenge.notes?.map((note) => (
         <Alert key={note} variant="success">
@@ -49,14 +68,16 @@ export function ChallengeBrief({
         ))}
       </div>
 
-      {showSubmitLink && (
+      {choiceControl}
+
+      {showSubmitLink && open && (
         <a
           href={challenge.href}
           target="_blank"
           rel="noopener noreferrer"
           className="bg-violet hover:bg-violet-hover inline-flex items-center gap-2 rounded-(--radius-control) px-4 py-2.5 text-sm font-medium text-white transition-colors"
         >
-          {challenge.submitLabel}
+          Open Challenge {challenge.number} submission
           <ExternalLink size={14} />
         </a>
       )}

@@ -29,7 +29,7 @@ export default async function ChallengeRunPage() {
       </ChallengeHeader>
 
       <main className="mx-auto max-w-4xl px-4 pb-16 sm:px-6">
-        <ChallengeTabs />
+        <ChallengeTabs chosenTrack={attempt.chosenTrack} />
       </main>
     </>
   );

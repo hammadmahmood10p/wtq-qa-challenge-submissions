@@ -71,7 +71,7 @@ export function ChangePasswordForm() {
         )}
       </Field>
 
-      <Button type="submit" variant="aurora" size="lg" full loading={pending}>
+      <Button type="submit" variant="brand" size="lg" full loading={pending}>
         {pending ? "Updating…" : "Set new password"}
       </Button>
     </form>

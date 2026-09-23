@@ -51,7 +51,7 @@ export function RadioCards({
               key={option.value}
               className={cn(
                 "relative flex cursor-pointer items-center justify-between gap-2 rounded-(--radius-control) border px-3.5 py-3 text-sm transition-all duration-(--duration-micro)",
-                "focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-(--aurora-violet)",
+                "focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-(--brand-indigo)",
                 selected
                   ? "border-violet bg-violet/8 font-medium"
                   : invalid

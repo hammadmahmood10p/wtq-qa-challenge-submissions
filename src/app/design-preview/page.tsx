@@ -1,7 +1,7 @@
 import { ThemeToggle } from "@/components/theme-toggle";
 
 /**
- * Aurora palette reference.
+ * Palette reference.
  *
  * Not linked from the application — it exists so the design language in
  * docs/DESIGN_LANGUAGE.md can be reviewed against something real rather than a list
@@ -9,9 +9,10 @@ import { ThemeToggle } from "@/components/theme-toggle";
  */
 
 const swatches = [
-  { name: "Aurora Violet", varName: "--aurora-violet", use: "Primary actions, active tabs, focus" },
-  { name: "Aurora Magenta", varName: "--aurora-magenta", use: "Gradient partner, accents" },
-  { name: "Aurora Amber", varName: "--aurora-amber", use: "Achievement, bonus score" },
+  { name: "Indigo", varName: "--brand-indigo", use: "Primary actions, active tabs, focus" },
+  { name: "Periwinkle", varName: "--brand-periwinkle", use: "From the WTQ mark — accents" },
+  { name: "Gold", varName: "--brand-gold", use: "From the WTQ mark — achievement, bonus" },
+  { name: "Ink", varName: "--brand-ink", use: "Deep navy panels and pills" },
   { name: "Success", varName: "--success", use: "Saved indicator, approved" },
   { name: "Warning", varName: "--warning", use: "Unsaved changes, pending" },
   { name: "Danger", varName: "--danger", use: "Destructive, validation errors" },
@@ -34,12 +35,12 @@ export default function Home() {
             Women Tech Quest 2026
           </p>
           <h1 className="font-display mt-3 text-4xl leading-tight font-bold sm:text-5xl">
-            <span className="aurora-text">QA Challenge Portal</span>
+            <span className="brand-text">QA Challenge Portal</span>
           </h1>
           <p className="text-muted mt-4 max-w-xl text-base">
-            Day 1 — foundations. Project scaffold, data model and design tokens are in
-            place. This page is a stand-in for the login screen, built so the Aurora
-            palette can be reviewed against something real.
+            The palette, the countdown ramp and the type scale, rendered so they can be
+            judged against something real rather than a list of hex codes. Aligned with
+            the WTQ26 Learning Portal, with accents taken from the event mark itself.
           </p>
         </div>
         <ThemeToggle />
@@ -49,10 +50,10 @@ export default function Home() {
       <section className="mb-14">
         <div
           className="shadow-(--shadow-raised) flex h-36 items-end rounded-(--radius-card) p-6"
-          style={{ background: "var(--aurora-gradient)" }}
+          style={{ background: "var(--brand-gradient)" }}
         >
           <span className="font-display text-lg font-semibold text-white drop-shadow">
-            Aurora — violet → magenta → amber
+            Indigo → violet → periwinkle
           </span>
         </div>
         <p className="text-muted mt-3 text-sm">

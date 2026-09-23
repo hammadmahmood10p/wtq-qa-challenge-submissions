@@ -4,7 +4,7 @@ Everything the build is waiting on, and everything deferred until after the even
 Reviewed at the Day 12 freeze; nothing here should reach 10 October unresolved unless
 it is marked *post-event*.
 
-**Last updated:** Day 7
+**Last updated:** after the four-challenge change
 
 ---
 
@@ -13,12 +13,13 @@ it is marked *post-event*.
 | # | Needed | Where it plugs in | Consequence if it arrives late |
 |---|---|---|---|
 | **P1** | **Application-under-test link** (Challenge 1) | `APPLICATION_UNDER_TEST_URL` in `src/lib/challenge-content.ts` | One constant. The briefing and the Challenge 1 page already show a "link pending" notice instead, so nothing breaks — but Challenge 1 is unusable without it on the day. Also needs to survive 1000 concurrent users, which is not our infrastructure |
-| **P2** | **Challenge 3 CSV** (~20 short test cases) | `CHALLENGE3_CSV_URL` in the same file | One constant plus a download link on the Challenge 3 page |
+| **P2** | **Challenge 4 CSV** (~20 short test cases) | `CHALLENGE4_CSV_URL` in the same file | One constant plus a download link on the Challenge 4 page |
 | **P3** | **Deployment target** from 10Pearls IT | Environment variables only — the app is host-agnostic by design (§2.1) | Gates the load test and the dress rehearsal, which are worthless run anywhere other than where the event runs. Also gates P4 |
 | **P4** | **Database region**, once P3 is known | Recreate the Neon project in the matching region | Currently us-east-2 (Ohio), ~205–280ms per query from Pakistan. Two minutes now, painful once participants have registered. See R1b |
-| **P5** | **Score scale** per challenge, and the +5 Challenge 2 bonus | `app_settings` rows, already seeded at 0 | Needed by Day 10, when judging is built. Configuration, not code — can be set the day before |
+| ~~**P5**~~ | ~~Score scale~~ | `src/lib/scoring.ts` | **Closed.** The organisers supplied the full rubric: ten criteria across four challenges, plus a +5 bonus for choosing Challenge 3 that a judge may adjust to −5 |
 | **P6** | **Judging model** — how many judges, and whether every submission gets a full review or only a shortlist | Assignment logic on Day 8 | An event-design decision. ~1000 submissions reviewed in one afternoon may not be physically possible; see §3.4 |
-| **P7** | **Branding** — is the Aurora palette approved? | `src/app/globals.css`, visible at `/design-preview` | Cheap to change now, expensive after the Day 11 polish pass |
+| **P7** | **Branding** — palette now aligned with the WTQ26 Learning Portal | `src/app/globals.css`, visible at `/design-preview` | Done. Indigo primary, lavender surfaces, deep-navy panels, with periwinkle/gold/green taken from the event mark |
+| **P8** | **The 10Pearls logo as an SVG** | Drop it at `public/10pearls-logo.svg`; `TenPearlsLogo` in `src/components/brand/logos.tsx` is one line to switch over | Currently drawn as type. Hand-drawing it from a screenshot would produce something subtly wrong, which is worse than an honest wordmark |
 
 ---
 

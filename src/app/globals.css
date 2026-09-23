@@ -1,49 +1,57 @@
 @import "tailwindcss";
 
 /* ===========================================================================
-   WTQ 2026 — Aurora design tokens
+   WTQ 2026 — design tokens
    Specified in docs/DESIGN_LANGUAGE.md. Change values here, never in components.
+
+   Aligned with the WTQ26 Learning Portal so the two sit together: an indigo
+   primary, lavender surfaces and deep-navy panels. The accents are taken from
+   the Women Tech Quest mark itself — periwinkle, gold and green — rather than
+   invented, so the logo never looks pasted onto a foreign palette.
    =========================================================================== */
 
 :root {
-  /* --- Aurora brand spectrum ------------------------------------------- */
-  --aurora-violet: #6d28d9;
-  --aurora-violet-hover: #5b21b6;
-  --aurora-magenta: #db2777;
-  --aurora-amber: #f59e0b;
-  --aurora-gradient: linear-gradient(135deg, #6d28d9, #db2777 55%, #f59e0b);
+  /* --- Brand ------------------------------------------------------------ */
+  --brand-indigo: #4f46e5; /* primary actions, active state */
+  --brand-indigo-hover: #4338ca;
+  --brand-periwinkle: #7f92ff; /* the mark's woman symbol */
+  --brand-gold: #fdc80f; /* the mark's quest squares */
+  --brand-green: #009d6d; /* the mark's wordmark */
+  --brand-ink: #1b1b3a; /* deep navy panels and pills */
+
+  --brand-gradient: linear-gradient(135deg, #4338ca, #6d4aea 55%, #7f92ff);
 
   /* --- Canvas (light) --------------------------------------------------- */
-  --bg: #faf9fc;
+  --bg: #fbfbfe;
   --surface: #ffffff;
-  --surface-raised: #f4f2f9;
-  --border: #e4e0ee;
-  --text: #1a1727;
-  --text-muted: #5d5878;
+  --surface-raised: #f3f2fd; /* lavender tint, as on the portal */
+  --border: #e5e3f4;
+  --text: #16162e;
+  --text-muted: #5c5a7a;
 
   /* --- Semantic --------------------------------------------------------- */
-  --success: #059669;
-  --warning: #d97706;
+  --success: #009d6d; /* the brand green, which is already a success colour */
+  --warning: #b45309; /* readable on white; the brand gold is not */
   --danger: #dc2626;
-  --info: #0891b2;
+  --info: #4f46e5;
 
-  /* --- Timer ramp (§2.4) ------------------------------------------------
+  /* --- Timer ramp (DESIGN_LANGUAGE §2.4) --------------------------------
      The countdown must be readable peripherally. Every step is also paired
      with a text cue, so colour is never the only signal. */
-  --timer-calm: #6d28d9; /* 3:00:00 - 0:30:00 */
-  --timer-caution: #d97706; /* 0:30:00 - 0:10:00 */
+  --timer-calm: #4f46e5; /* 3:00:00 - 0:30:00 */
+  --timer-caution: #b45309; /* 0:30:00 - 0:10:00 */
   --timer-warning: #ea580c; /* 0:10:00 - 0:05:00 */
   --timer-critical: #dc2626; /* under 0:05:00 */
 
   /* --- Form ------------------------------------------------------------- */
   --radius-card: 12px;
   --radius-control: 8px;
-  /* Violet-tinted rather than grey, so cards sit on the canvas instead of
+  /* Indigo-tinted rather than grey, so cards sit on the canvas instead of
      floating above a different colour temperature. */
-  --shadow-card: 0 4px 24px rgba(45, 27, 105, 0.08);
-  --shadow-raised: 0 8px 40px rgba(45, 27, 105, 0.12);
+  --shadow-card: 0 4px 24px rgba(27, 27, 58, 0.07);
+  --shadow-raised: 0 8px 40px rgba(27, 27, 58, 0.12);
 
-  /* --- Motion (§4) ------------------------------------------------------ */
+  /* --- Motion (DESIGN_LANGUAGE §4) -------------------------------------- */
   --duration-micro: 150ms;
   --duration-standard: 250ms;
   --duration-page: 400ms;
@@ -51,24 +59,27 @@
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
 }
 
-/* Dark is the default for the challenge runtime: a three-hour session on a bright
-   white page is genuinely tiring. Honour an explicit light choice if one is set. */
+/* The portal is a light product, so light is the default in both schemes.
+   Dark mode is kept for anyone whose system asks for it, built from the same
+   deep navy the panels use rather than a neutral grey. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0b0a14;
-    --surface: #151327;
-    --surface-raised: #1e1b34;
-    --border: #2a2645;
-    --text: #f4f2f9;
-    --text-muted: #a9a3c4;
+    --bg: #101026;
+    --surface: #1b1b3a;
+    --surface-raised: #24244a;
+    --border: #32325c;
+    --text: #f2f1fa;
+    --text-muted: #a6a3c4;
 
-    /* Lifted for contrast against the Ink canvas. */
+    /* Lifted for contrast against the navy canvas. */
+    --brand-indigo: #8b83f5;
+    --brand-indigo-hover: #a29bf8;
     --success: #34d399;
     --warning: #fbbf24;
     --danger: #f87171;
-    --info: #22d3ee;
+    --info: #8b83f5;
 
-    --timer-calm: #a78bfa;
+    --timer-calm: #a5b0ff;
     --timer-caution: #fbbf24;
     --timer-warning: #fb923c;
     --timer-critical: #f87171;
@@ -79,19 +90,21 @@
 }
 
 :root[data-theme="dark"] {
-  --bg: #0b0a14;
-  --surface: #151327;
-  --surface-raised: #1e1b34;
-  --border: #2a2645;
-  --text: #f4f2f9;
-  --text-muted: #a9a3c4;
+  --bg: #101026;
+  --surface: #1b1b3a;
+  --surface-raised: #24244a;
+  --border: #32325c;
+  --text: #f2f1fa;
+  --text-muted: #a6a3c4;
 
+  --brand-indigo: #8b83f5;
+  --brand-indigo-hover: #a29bf8;
   --success: #34d399;
   --warning: #fbbf24;
   --danger: #f87171;
-  --info: #22d3ee;
+  --info: #8b83f5;
 
-  --timer-calm: #a78bfa;
+  --timer-calm: #a5b0ff;
   --timer-caution: #fbbf24;
   --timer-warning: #fb923c;
   --timer-critical: #f87171;
@@ -100,7 +113,7 @@
   --shadow-raised: 0 8px 40px rgba(0, 0, 0, 0.55);
 }
 
-/* Expose the tokens to Tailwind utilities: bg-surface, text-muted, rounded-card... */
+/* Expose the tokens to Tailwind utilities: bg-surface, text-muted, rounded-card… */
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -109,10 +122,14 @@
   --color-text: var(--text);
   --color-muted: var(--text-muted);
 
-  --color-violet: var(--aurora-violet);
-  --color-violet-hover: var(--aurora-violet-hover);
-  --color-magenta: var(--aurora-magenta);
-  --color-amber: var(--aurora-amber);
+  /* `violet` is the primary throughout the components; it now resolves to the
+     portal's indigo. Kept as a name so the meaning stays "the brand action
+     colour" rather than a specific hue. */
+  --color-violet: var(--brand-indigo);
+  --color-violet-hover: var(--brand-indigo-hover);
+  --color-periwinkle: var(--brand-periwinkle);
+  --color-gold: var(--brand-gold);
+  --color-ink: var(--brand-ink);
 
   --color-success: var(--success);
   --color-warning: var(--warning);
@@ -139,21 +156,11 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Focus is always visible. Never remove this. (§5) */
+/* Focus is always visible. Never remove this. (DESIGN_LANGUAGE §5) */
 :focus-visible {
-  outline: 2px solid var(--aurora-violet);
+  outline: 2px solid var(--brand-indigo);
   outline-offset: 2px;
   border-radius: 2px;
-}
-
-/* Required-field marker.
-   Drawn with generated content rather than a <span> inside the <label>, so the
-   label's text stays exactly "Password" and not "Password *". That matters twice
-   over: it is the field's accessible name, and it is what a tester locates by. The
-   semantics come from the input's `required` attribute, not from this asterisk. */
-.required-mark::after {
-  content: " *";
-  color: var(--danger);
 }
 
 /* Tabular figures so the countdown does not jitter as digits change. */
@@ -161,11 +168,21 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.aurora-text {
-  background: var(--aurora-gradient);
+.brand-text {
+  background: var(--brand-gradient);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* Required-field marker.
+   Drawn with generated content rather than a <span> inside the <label>, so the
+   label's text stays exactly "Password" and not "Password *". That matters
+   twice over: it is the field's accessible name, and it is what a tester
+   locates by. The semantics come from the input's `required` attribute. */
+.required-mark::after {
+  content: " *";
+  color: var(--danger);
 }
 
 /* Nobody should be fighting the interface for three hours. (§4) */

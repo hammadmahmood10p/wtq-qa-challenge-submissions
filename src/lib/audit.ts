@@ -29,12 +29,14 @@ export type AuditAction =
   | "admin.judge_approved"
   | "admin.judge_rejected"
   | "attempt.started"
+  | "attempt.track_chosen"
   | "attempt.submitted"
   | "attempt.auto_submitted"
   | "evaluation.assigned"
   | "evaluation.score_saved"
   | "evaluation.submitted"
-  | "evaluation.unlocked";
+  | "evaluation.unlocked"
+  | "evaluation.bonus_adjusted";
 
 interface AuditInput {
   action: AuditAction;

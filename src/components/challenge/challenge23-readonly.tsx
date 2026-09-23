@@ -1,4 +1,5 @@
 import { AlertTriangle, ExternalLink, Eye, FileText, FolderGit2 } from "lucide-react";
+import type { ChallengeKey } from "@/generated/prisma/enums";
 
 /**
  * Challenges 2 and 3 as a judge sees them.
@@ -13,9 +14,11 @@ import { AlertTriangle, ExternalLink, Eye, FileText, FolderGit2 } from "lucide-r
 
 export function Challenge2ReadOnly({
   attemptId,
+  challenge,
   submission,
 }: {
   attemptId: string;
+  challenge: ChallengeKey;
   submission: { originalFilename: string; sizeBytes: number; uploadedAt: Date } | null;
 }) {
   if (!submission) {
@@ -48,7 +51,7 @@ export function Challenge2ReadOnly({
         key never reaches the browser.
       */}
       <a
-        href={`/api/files/challenge2/${attemptId}`}
+        href={`/api/files/submission/${attemptId}/${challenge.toLowerCase()}`}
         target="_blank"
         rel="noopener noreferrer"
         className="bg-violet hover:bg-violet-hover inline-flex shrink-0 items-center gap-2 rounded-(--radius-control) px-4 py-2.5 text-sm font-medium text-white transition-colors"

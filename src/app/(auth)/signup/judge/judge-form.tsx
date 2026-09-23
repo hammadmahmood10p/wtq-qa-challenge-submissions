@@ -98,7 +98,7 @@ export function JudgeForm() {
         )}
       </Field>
 
-      <Button type="submit" variant="aurora" size="lg" full loading={pending}>
+      <Button type="submit" variant="brand" size="lg" full loading={pending}>
         {pending ? "Creating your account…" : "Request an account"}
       </Button>
 

@@ -39,7 +39,7 @@ export function AddPersonDialog({ kind }: { kind: "participant" | "judge" }) {
   return (
     <>
       <Button
-        variant="aurora"
+        variant="brand"
         onClick={() => {
           setDismissed(true); // clear any previous result before reopening
           setOpen(true);

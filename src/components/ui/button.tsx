@@ -9,7 +9,7 @@ const button = cva(
       variant: {
         // The Aurora gradient is reserved for the few moments that matter
         // (DESIGN_LANGUAGE.md §4.1) — not every primary button in the app.
-        aurora: "text-white shadow-(--shadow-card) hover:brightness-110 active:brightness-95",
+        brand: "text-white shadow-(--shadow-card) hover:brightness-110 active:brightness-95",
         primary: "bg-violet text-white hover:bg-violet-hover active:brightness-95",
         secondary: "border border-border bg-surface text-text hover:bg-surface-raised",
         ghost: "text-muted hover:bg-surface-raised hover:text-text",
@@ -42,7 +42,7 @@ export function Button({
   return (
     <button
       className={cn(button({ variant, size, full }), className)}
-      style={variant === "aurora" ? { background: "var(--aurora-gradient)" } : undefined}
+      style={variant === "brand" ? { background: "var(--brand-gradient)" } : undefined}
       disabled={disabled || loading}
       {...props}
     >

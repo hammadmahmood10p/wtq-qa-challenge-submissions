@@ -3,6 +3,7 @@
 import { BookOpen, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect } from "react";
+import { WtqLogo } from "@/components/brand/logos";
 import { onAttemptClosed } from "@/lib/attempt-channel";
 import { cn } from "@/lib/utils";
 import { useCountdown, type TimerPhase } from "./use-countdown";
@@ -69,7 +70,9 @@ export function ChallengeHeader({
   return (
     <header className="border-border bg-surface/90 sticky top-0 z-40 border-b backdrop-blur">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-        <div className="flex items-baseline gap-3">
+        <div className="flex items-center gap-4">
+          <WtqLogo size={34} className="hidden shrink-0 sm:block" />
+
           <div>
             <p className="text-muted font-mono text-[10px] tracking-[0.18em] uppercase">
               {PHASE_LABEL[phase]}

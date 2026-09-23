@@ -44,9 +44,25 @@ enum AttemptState {
   EXPIRED
 }
 
-enum Challenge1ItemKind {
-  BUG_REPORT
-  TEST_CASE
+/// Which half of a Challenge 1 entry an attachment belongs to.
+enum Challenge1Slot {
+  BUG
+  TEST
+}
+
+enum ChallengeKey {
+  C1
+  C2
+  C3
+  C4
+}
+
+/// Challenges 3 and 4 are alternatives: a participant commits to one and the other
+/// closes. Recorded here rather than inferred from which submission rows exist,
+/// because the choice is deliberate, irreversible, and carries a bonus.
+enum ChallengeTrack {
+  C3
+  C4
 }
 
 enum EvaluationStatus {
@@ -77,17 +93,17 @@ model User {
   deletedAt   DateTime?
 
   // Populated when a super admin creates the account rather than the user signing up.
-  createdById String? @db.Uuid
-  createdBy   User?   @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  createdUsers User[] @relation("UserCreatedBy")
+  createdById  String? @db.Uuid
+  createdBy    User?   @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdUsers User[]  @relation("UserCreatedBy")
 
   participantProfile ParticipantProfile?
   judgeProfile       JudgeProfile?
   sessions           Session[]
-  auditEvents        AuditLog[]        @relation("AuditActor")
-  evaluations        Evaluation[]      @relation("EvaluationJudge")
-  approvedJudges     JudgeProfile[]    @relation("JudgeApprovedBy")
-  unlocksGranted     EvaluationUnlock[] @relation("UnlockGrantedBy")
+  auditEvents        AuditLog[]          @relation("AuditActor")
+  evaluations        Evaluation[]        @relation("EvaluationJudge")
+  approvedJudges     JudgeProfile[]      @relation("JudgeApprovedBy")
+  unlocksGranted     EvaluationUnlock[]  @relation("UnlockGrantedBy")
 
   @@index([role, status])
   @@index([status])
@@ -130,15 +146,15 @@ model JudgeProfile {
 // Server-side session record. The JWT carries only this row's id, so blocking a user
 // or final submission revokes every open tab immediately.
 model Session {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  revokedAt DateTime?
-  createdAt DateTime @default(now())
-  lastSeenAt DateTime @default(now())
-  ip        String?
-  userAgent String?
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  ip         String?
+  userAgent  String?
 
   @@index([userId])
   @@index([expiresAt])
@@ -150,8 +166,8 @@ model Session {
 // ---------------------------------------------------------------------------
 
 model Attempt {
-  id            String   @id @default(uuid()) @db.Uuid
-  participantId String   @unique @db.Uuid
+  id            String             @id @default(uuid()) @db.Uuid
+  participantId String             @unique @db.Uuid
   participant   ParticipantProfile @relation(fields: [participantId], references: [userId], onDelete: Cascade)
 
   // The clock. Authoritative on the server; the browser only renders a countdown
@@ -164,61 +180,110 @@ model Attempt {
   submittedAt   DateTime?
   autoSubmitted Boolean      @default(false)
 
+  /// Null until the participant commits to Challenge 3 or Challenge 4. Once set it is
+  /// never changed: the other challenge is closed to them from that moment.
+  chosenTrack   ChallengeTrack?
+  chosenTrackAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  challenge1Items Challenge1Item[]
-  challenge2      Challenge2Submission?
-  challenge3      Challenge3Submission?
-  evaluation      Evaluation?
+  challenge1Entries Challenge1Entry[]
+  submissions       ChallengeSubmission[]
+  evaluation        Evaluation?
 
   @@index([state])
   @@index([endsAt])
   @@map("attempts")
 }
 
-// Bug reports and test cases share a table — identical shape, different kind.
-model Challenge1Item {
-  id        String             @id @default(uuid()) @db.Uuid
-  attemptId String             @db.Uuid
-  attempt   Attempt            @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  kind      Challenge1ItemKind
-  title     String
-  description String
-  position  Int
+/// One finding: a bug report and the test case that covers it.
+///
+/// They were separate lists until the organisers asked for each test case to sit
+/// beside the bug it came from — which is how a tester actually works, and makes the
+/// pairing visible to a judge rather than something they have to reconstruct.
+model Challenge1Entry {
+  id        String  @id @default(uuid()) @db.Uuid
+  attemptId String  @db.Uuid
+  attempt   Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  bugTitle       String @default("")
+  bugDescription String @default("")
+
+  testTitle       String @default("")
+  testDescription String @default("")
+
+  position Int
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([attemptId, kind, position])
-  @@map("challenge1_items")
+  attachments Challenge1Attachment[]
+
+  @@index([attemptId, position])
+  @@map("challenge1_entries")
 }
 
-model Challenge2Submission {
-  attemptId String  @id @db.Uuid
-  attempt   Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+/// Screenshot evidence attached to one half of an entry.
+///
+/// Stored like any other upload — an opaque key in object storage, never a path the
+/// client can construct — and served through an authorised route rather than a public
+/// URL. A bug report without a screenshot is much harder to act on, so this is closer
+/// to core than to a nicety.
+model Challenge1Attachment {
+  id      String          @id @default(uuid()) @db.Uuid
+  entryId String          @db.Uuid
+  entry   Challenge1Entry @relation(fields: [entryId], references: [id], onDelete: Cascade)
 
-  // Opaque storage key. Never a path the client can construct or guess.
+  slot             Challenge1Slot
   fileKey          String
   originalFilename String
-  sizeBytes        Int
   contentType      String
-  uploadedAt       DateTime @default(now())
+  sizeBytes        Int
+  position         Int
 
-  @@map("challenge2_submissions")
+  createdAt DateTime @default(now())
+
+  @@index([entryId, slot, position])
+  @@map("challenge1_attachments")
 }
 
-model Challenge3Submission {
-  attemptId String  @id @db.Uuid
-  attempt   Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+/// One row per challenge a participant submits to.
+///
+/// Challenges 2, 3 and 4 differ in what they collect — a PDF, a repository link, and
+/// in every case a set of written answers — but they share a lifecycle: saved
+/// repeatedly during the attempt, frozen when it seals, then read by a judge. One
+/// table keeps that lifecycle in one place instead of three.
+///
+/// Challenge 1 keeps its own table: it is a list of many items, not one submission.
+model ChallengeSubmission {
+  attemptId String       @db.Uuid
+  challenge ChallengeKey
+  attempt   Attempt      @relation(fields: [attemptId], references: [id], onDelete: Cascade)
 
-  githubUrl String
-  // Best-effort reachability check at save time. A false here warns but never blocks:
-  // a GitHub outage must not cost a participant their submission.
+  /// Uploaded report (Challenges 2 and 3). An opaque key the client never sees.
+  fileKey          String?
+  originalFilename String?
+  sizeBytes        Int?
+  contentType      String?
+  uploadedAt       DateTime?
+
+  /// Repository link (Challenge 4).
+  githubUrl      String?
+  /// Best-effort reachability at save time. False warns but never blocks: a GitHub
+  /// outage must not cost a participant their submission.
   verifiedPublic Boolean?
-  savedAt        DateTime @default(now())
 
-  @@map("challenge3_submissions")
+  /// Written answers, keyed by question id. JSON because the questions differ per
+  /// challenge and are expected to be revised between events; a column each would
+  /// mean a migration every time the organisers reword one.
+  answers Json @default("{}")
+
+  savedAt   DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@id([attemptId, challenge])
+  @@map("challenge_submissions")
 }
 
 // ---------------------------------------------------------------------------
@@ -239,13 +304,13 @@ model Evaluation {
   // Soft claim: refreshed while a judge has the review page open. Expires on inactivity.
   claimedAt  DateTime?
 
-  scoreC1        Decimal?  @db.Decimal(6, 2)
-  scoreC1SavedAt DateTime?
-  scoreC2        Decimal?  @db.Decimal(6, 2)
-  scoreC2Bonus   Decimal?  @db.Decimal(6, 2)
-  scoreC2SavedAt DateTime?
-  scoreC3        Decimal?  @db.Decimal(6, 2)
-  scoreC3SavedAt DateTime?
+  /// Individual criterion scores. See src/lib/scoring.ts for the rubric.
+  scores EvaluationScore[]
+
+  /// Granted automatically when a participant commits to Challenge 3, and adjustable
+  /// by the judge or a super admin — down to -5 where the work does not justify it.
+  /// Signed, so it is an adjustment rather than a reward that can only be given.
+  bonusPoints Decimal? @db.Decimal(6, 2)
 
   // Frozen at the moment of final submission, so a later change to the score
   // configuration can never retroactively alter a submitted result.
@@ -260,14 +325,33 @@ model Evaluation {
   @@map("evaluations")
 }
 
+/// One judge's score against one rubric criterion.
+///
+/// A row per criterion rather than a column per criterion: the rubric is expected to
+/// change between events, and adding a criterion should not require a migration. The
+/// keys are defined in src/lib/scoring.ts, which is the single source of truth for
+/// what exists and what each is worth.
+model EvaluationScore {
+  evaluationId String     @db.Uuid
+  evaluation   Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  /// e.g. "c1.bug_hunting". Validated against the rubric before it is written.
+  criterion String
+  score     Decimal  @db.Decimal(6, 2)
+  savedAt   DateTime @default(now())
+
+  @@id([evaluationId, criterion])
+  @@map("evaluation_scores")
+}
+
 // A locked evaluation can only be reopened by a super admin, with a reason, audited.
 model EvaluationUnlock {
   id           String     @id @default(uuid()) @db.Uuid
   evaluationId String     @db.Uuid
   evaluation   Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
 
-  unlockedById String @db.Uuid
-  unlockedBy   User   @relation("UnlockGrantedBy", fields: [unlockedById], references: [id])
+  unlockedById String   @db.Uuid
+  unlockedBy   User     @relation("UnlockGrantedBy", fields: [unlockedById], references: [id])
   reason       String
   unlockedAt   DateTime @default(now())
 

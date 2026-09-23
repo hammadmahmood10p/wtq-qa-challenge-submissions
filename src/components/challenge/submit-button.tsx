@@ -46,7 +46,7 @@ export function SubmitButton() {
 
   return (
     <>
-      <Button variant="aurora" onClick={() => setOpen(true)}>
+      <Button variant="brand" onClick={() => setOpen(true)}>
         <Send size={15} />
         Submit
       </Button>
@@ -68,7 +68,7 @@ export function SubmitButton() {
             <Button variant="secondary" onClick={() => setOpen(false)} disabled={pending}>
               Cancel
             </Button>
-            <Button variant="aurora" onClick={confirm} loading={pending}>
+            <Button variant="brand" onClick={confirm} loading={pending}>
               {pending ? "Submitting…" : "Confirm"}
             </Button>
           </div>

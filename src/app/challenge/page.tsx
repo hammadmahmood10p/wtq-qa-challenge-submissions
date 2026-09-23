@@ -45,7 +45,7 @@ export default async function ChallengeBriefingPage() {
           Women Tech Quest 2026
         </p>
         <h1 className="font-display mt-2 text-3xl font-bold sm:text-4xl">
-          <span className="aurora-text">Your QA challenge</span>
+          <span className="brand-text">Your QA challenge</span>
         </h1>
         <p className="text-muted mt-3">
           Everything you need to know before you begin. This page stays available
@@ -117,7 +117,7 @@ export default async function ChallengeBriefingPage() {
             key={challenge.id}
             className="border-border bg-surface shadow-(--shadow-card) rounded-(--radius-card) border p-6"
           >
-            <ChallengeBrief challenge={challenge} />
+            <ChallengeBrief challenge={challenge} chosenTrack={attempt.chosenTrack} />
           </div>
         ))}
       </div>
@@ -132,7 +132,7 @@ export default async function ChallengeBriefingPage() {
             restarted. Make sure you are settled before you begin.
           </p>
           <form action={beginChallenge}>
-            <Button type="submit" variant="aurora" size="lg">
+            <Button type="submit" variant="brand" size="lg">
               Let&apos;s begin with the challenge
             </Button>
           </form>

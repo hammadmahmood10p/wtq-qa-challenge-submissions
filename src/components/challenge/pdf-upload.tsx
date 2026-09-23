@@ -3,17 +3,19 @@
 import { Eye, FileText, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
-import { saveChallenge2, type SubmissionResult } from "@/app/actions/challenge23";
+import { uploadChallengeFile, type SubmissionResult } from "@/app/actions/challenge-submission";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import type { ChallengeKey } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 
 const INITIAL: SubmissionResult = { ok: false };
 
 interface Props {
+  challenge: ChallengeKey;
   attemptId: string;
   maxUploadMb: number;
-  existing: { filename: string; sizeBytes: number; uploadedAt: string } | null;
+  existing: { filename: string; sizeBytes: number } | null;
 }
 
 function formatSize(bytes: number): string {
@@ -24,10 +26,9 @@ function formatSize(bytes: number): string {
 /**
  * The file chooser, with its own state.
  *
- * Separated so the parent can clear it after a successful upload by changing its
- * `key`, which remounts it and resets both the React state and the native input. The
- * alternative — clearing state from an effect that watches the action result — is the
- * cascading-render pattern React now warns about.
+ * Separated so the parent can clear it after a successful upload by changing its key,
+ * which remounts it and resets both the React state and the native input — rather than
+ * clearing state from an effect watching the action result.
  */
 function FilePicker({ maxUploadMb }: { maxUploadMb: number }) {
   const [selected, setSelected] = useState<File | null>(null);
@@ -63,12 +64,12 @@ function FilePicker({ maxUploadMb }: { maxUploadMb: number }) {
     >
       <FileText size={22} className="text-muted mx-auto mb-3" />
 
-      <label htmlFor="challenge2-file" className="block cursor-pointer">
+      <label htmlFor="challenge-file" className="block cursor-pointer">
         <span className="text-violet text-sm font-medium underline">Choose your PDF</span>
         <span className="text-muted text-sm"> or drag it here</span>
         <input
           ref={inputRef}
-          id="challenge2-file"
+          id="challenge-file"
           name="file"
           type="file"
           accept="application/pdf,.pdf"
@@ -89,15 +90,15 @@ function FilePicker({ maxUploadMb }: { maxUploadMb: number }) {
 }
 
 /**
- * Challenge 2's upload.
+ * One PDF per challenge, replaced on re-upload (D9).
  *
- * One file, replaced on re-upload (D9). The already-uploaded state is shown
- * prominently because the commonest anxiety here is "did that work?" — and once the
- * attempt closes there is no way to check, so an ambiguous answer is not good enough.
+ * The already-uploaded state is shown prominently because the commonest anxiety here
+ * is "did that work?" — and once the attempt closes there is no way to check.
  */
-export function Challenge2Form({ attemptId, maxUploadMb, existing }: Props) {
+export function PdfUpload({ challenge, attemptId, maxUploadMb, existing }: Props) {
   const router = useRouter();
-  const [state, formAction, pending] = useActionState(saveChallenge2, INITIAL);
+  const action = uploadChallengeFile.bind(null, challenge);
+  const [state, formAction, pending] = useActionState(action, INITIAL);
 
   useEffect(() => {
     if (state.closed) router.refresh();
@@ -113,7 +114,7 @@ export function Challenge2Form({ attemptId, maxUploadMb, existing }: Props) {
             <span className="font-mono text-xs">{existing.filename}</span>
             <span className="text-xs opacity-80">{formatSize(existing.sizeBytes)}</span>
             <a
-              href={`/api/files/challenge2/${attemptId}`}
+              href={`/api/files/submission/${attemptId}/${challenge.toLowerCase()}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-xs font-medium underline"
@@ -129,12 +130,9 @@ export function Challenge2Form({ attemptId, maxUploadMb, existing }: Props) {
       <FilePicker key={state.savedAt ?? "initial"} maxUploadMb={maxUploadMb} />
 
       <div className="flex flex-wrap items-center gap-3">
-        {/*
-          Always enabled. Whether a file was chosen is decided by the server, which has
-          to check anyway — a disabled button would only be a second, weaker copy of
-          that rule.
-        */}
-        <Button type="submit" variant="aurora" loading={pending}>
+        {/* Always enabled. Whether a file was chosen is decided by the server, which
+            has to check anyway — a disabled button would be a weaker second copy. */}
+        <Button type="submit" variant="brand" loading={pending}>
           <Upload size={15} />
           {existing ? "Replace and save" : "Save"}
         </Button>

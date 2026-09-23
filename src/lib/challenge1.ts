@@ -1,69 +1,97 @@
 import "server-only";
 
-import type { Challenge1ItemKind } from "@/generated/prisma/enums";
+import type { Challenge1Slot } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 
 /**
- * Challenge 1: bug reports and test cases.
+ * Challenge 1: paired findings.
  *
- * Both are the same shape — a title and a description — so they share a table and
- * differ only by `kind`. That keeps ordering, autosave, the caps and the judge's
- * read-only view as one implementation rather than two that drift apart.
+ * Each entry is one bug report and the test case that covers it, side by side. They
+ * were separate lists until the organisers asked for them to be paired — which is how
+ * a tester actually works, and means a judge can see which test case belongs to which
+ * bug rather than inferring it.
  *
- * The caps and labels live in ./challenge1-limits so that client components can read
- * them without dragging the database driver into the browser bundle.
+ * The caps and labels live in ./challenge1-limits so client components can read them
+ * without dragging the database driver into the browser bundle.
  */
 export {
   DESCRIPTION_MAX,
-  KIND_LABELS,
-  MAX_ITEMS_PER_KIND,
+  MAX_ENTRIES,
   TITLE_MAX,
 } from "./challenge1-limits";
 
-export interface Challenge1Item {
+export interface EntryAttachment {
   id: string;
-  kind: Challenge1ItemKind;
-  title: string;
-  description: string;
+  slot: Challenge1Slot;
+  originalFilename: string;
+  contentType: string;
+  sizeBytes: number;
   position: number;
-  updatedAt: Date;
 }
 
-export async function listChallenge1Items(attemptId: string): Promise<Challenge1Item[]> {
-  return db.challenge1Item.findMany({
+export interface Challenge1Entry {
+  id: string;
+  bugTitle: string;
+  bugDescription: string;
+  testTitle: string;
+  testDescription: string;
+  position: number;
+  attachments: EntryAttachment[];
+}
+
+export async function listChallenge1Entries(attemptId: string): Promise<Challenge1Entry[]> {
+  const rows = await db.challenge1Entry.findMany({
     where: { attemptId },
-    orderBy: [{ kind: "asc" }, { position: "asc" }],
+    orderBy: { position: "asc" },
     select: {
       id: true,
-      kind: true,
-      title: true,
-      description: true,
+      bugTitle: true,
+      bugDescription: true,
+      testTitle: true,
+      testDescription: true,
       position: true,
-      updatedAt: true,
+      attachments: {
+        orderBy: [{ slot: "asc" }, { position: "asc" }],
+        select: {
+          id: true,
+          slot: true,
+          originalFilename: true,
+          contentType: true,
+          sizeBytes: true,
+          position: true,
+        },
+      },
     },
   });
-}
 
-export function groupByKind(items: Challenge1Item[]) {
-  return {
-    BUG_REPORT: items.filter((i) => i.kind === "BUG_REPORT"),
-    TEST_CASE: items.filter((i) => i.kind === "TEST_CASE"),
-  };
+  return rows;
 }
 
 /**
- * Confirms the item belongs to this participant's own attempt.
+ * Confirms the entry belongs to this participant's own attempt.
  *
- * Every item is addressed by an opaque id that travels to the browser, so without
- * this check one participant could edit or delete another's work by changing a value
- * in a request — the first thing a room full of QA engineers will try. Ownership is
- * re-derived from the session on every write; it is never taken from the request.
+ * Entries are addressed by opaque ids that travel to the browser, so without this one
+ * participant could edit or delete another's work by changing a value in a request —
+ * the first thing a room full of QA engineers will try. Ownership is re-derived from
+ * the session on every write, never taken from the request.
  */
-export async function assertOwnsItem(itemId: string, participantId: string): Promise<void> {
-  const item = await db.challenge1Item.findFirst({
-    where: { id: itemId, attempt: { participantId } },
+export async function assertOwnsEntry(entryId: string, participantId: string): Promise<void> {
+  const entry = await db.challenge1Entry.findFirst({
+    where: { id: entryId, attempt: { participantId } },
     select: { id: true },
   });
 
-  if (!item) throw new Error("Item not found");
+  if (!entry) throw new Error("Entry not found");
+}
+
+export async function assertOwnsAttachment(
+  attachmentId: string,
+  participantId: string,
+): Promise<void> {
+  const attachment = await db.challenge1Attachment.findFirst({
+    where: { id: attachmentId, entry: { attempt: { participantId } } },
+    select: { id: true },
+  });
+
+  if (!attachment) throw new Error("Attachment not found");
 }

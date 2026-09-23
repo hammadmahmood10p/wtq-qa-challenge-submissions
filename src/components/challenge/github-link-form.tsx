@@ -3,7 +3,7 @@
 import { Check, ExternalLink, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useState } from "react";
-import { saveChallenge3, type SubmissionResult } from "@/app/actions/challenge23";
+import { saveChallengeLink, type SubmissionResult } from "@/app/actions/challenge-submission";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
@@ -15,9 +15,9 @@ interface Props {
   existing: { githubUrl: string; verifiedPublic: boolean | null } | null;
 }
 
-export function Challenge3Form({ existing }: Props) {
+export function GithubLinkForm({ existing }: Props) {
   const router = useRouter();
-  const [state, formAction, pending] = useActionState(saveChallenge3, INITIAL);
+  const [state, formAction, pending] = useActionState(saveChallengeLink, INITIAL);
   const [url, setUrl] = useState(existing?.githubUrl ?? "");
 
   useEffect(() => {
@@ -71,7 +71,7 @@ export function Challenge3Form({ existing }: Props) {
       </Field>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" variant="aurora" loading={pending}>
+        <Button type="submit" variant="brand" loading={pending}>
           <Save size={15} />
           Save
         </Button>

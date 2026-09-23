@@ -1,36 +1,41 @@
 "use client";
 
+import { Lock } from "lucide-react";
 import { useState } from "react";
+import type { ChallengeKey } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 
-const TABS = [
-  { id: "c1", label: "Task 1", sub: "Manual QA" },
-  { id: "c2", label: "Task 2", sub: "Chatbot Evaluation" },
-  { id: "c3", label: "Task 3", sub: "Automation Readiness" },
-] as const;
+export interface ReviewPanel {
+  challenge: ChallengeKey;
+  label: string;
+  sub: string;
+  /** False for the alternative the participant did not choose. */
+  applicable: boolean;
+  content: React.ReactNode;
+}
 
 /**
- * The three review sub-tabs (judge requirement 4).
+ * The review sub-tabs, one per challenge.
  *
- * All three panels are rendered and kept mounted, with the inactive ones hidden. Once
- * Day 10 adds a score field per task, switching tabs must not discard a number a judge
- * has typed but not yet saved — and unmounting the panel would do exactly that.
+ * All four are shown rather than only the ones that apply, so a judge can see at a
+ * glance which alternative the participant took — a missing tab would read as a
+ * rendering fault. The one they did not choose is disabled and labelled.
+ *
+ * Panels stay mounted while hidden: a score typed but not yet saved must survive
+ * switching tabs, and unmounting would discard it.
  */
-export function ReviewTabs({
-  panels,
-}: {
-  panels: { c1: React.ReactNode; c2: React.ReactNode; c3: React.ReactNode };
-}) {
-  const [active, setActive] = useState<(typeof TABS)[number]["id"]>("c1");
+export function ReviewTabs({ panels }: { panels: ReviewPanel[] }) {
+  const selectable = panels.filter((p) => p.applicable);
+  const [active, setActive] = useState<ChallengeKey>(selectable[0]?.challenge ?? "C1");
 
   function onKeyDown(event: React.KeyboardEvent) {
-    const index = TABS.findIndex((t) => t.id === active);
-    const last = TABS.length - 1;
+    const index = selectable.findIndex((p) => p.challenge === active);
+    const last = selectable.length - 1;
 
-    if (event.key === "ArrowRight") setActive(TABS[index === last ? 0 : index + 1].id);
-    else if (event.key === "ArrowLeft") setActive(TABS[index === 0 ? last : index - 1].id);
-    else if (event.key === "Home") setActive(TABS[0].id);
-    else if (event.key === "End") setActive(TABS[last].id);
+    if (event.key === "ArrowRight") setActive(selectable[index === last ? 0 : index + 1].challenge);
+    else if (event.key === "ArrowLeft") setActive(selectable[index === 0 ? last : index - 1].challenge);
+    else if (event.key === "Home") setActive(selectable[0].challenge);
+    else if (event.key === "End") setActive(selectable[last].challenge);
     else return;
 
     event.preventDefault();
@@ -44,24 +49,30 @@ export function ReviewTabs({
         onKeyDown={onKeyDown}
         className="border-border flex gap-1 overflow-x-auto border-b"
       >
-        {TABS.map((tab) => {
-          const selected = tab.id === active;
+        {panels.map((panel) => {
+          const selected = panel.challenge === active;
+
           return (
             <button
-              key={tab.id}
+              key={panel.challenge}
               role="tab"
-              id={`review-tab-${tab.id}`}
+              id={`review-tab-${panel.challenge}`}
               aria-selected={selected}
-              aria-controls={`review-panel-${tab.id}`}
+              aria-controls={`review-panel-${panel.challenge}`}
+              disabled={!panel.applicable}
               tabIndex={selected ? 0 : -1}
-              onClick={() => setActive(tab.id)}
+              onClick={() => panel.applicable && setActive(panel.challenge)}
               className={cn(
-                "relative shrink-0 px-4 py-3 text-left text-sm whitespace-nowrap transition-colors",
-                selected ? "text-violet font-semibold" : "text-muted hover:text-text",
+                "relative flex shrink-0 items-center gap-1.5 px-4 py-3 text-left text-sm whitespace-nowrap transition-colors",
+                !panel.applicable && "text-muted/50 cursor-not-allowed",
+                panel.applicable && selected && "text-violet font-semibold",
+                panel.applicable && !selected && "text-muted hover:text-text",
               )}
+              title={panel.applicable ? undefined : "The participant did not choose this challenge"}
             >
-              {tab.label}
-              <span className="text-muted ml-2 hidden font-normal sm:inline">{tab.sub}</span>
+              {!panel.applicable && <Lock size={12} />}
+              {panel.label}
+              <span className="text-muted ml-1 hidden font-normal sm:inline">{panel.sub}</span>
               {selected && (
                 <span
                   aria-hidden="true"
@@ -73,19 +84,21 @@ export function ReviewTabs({
         })}
       </div>
 
-      {TABS.map((tab) => (
-        <div
-          key={tab.id}
-          role="tabpanel"
-          id={`review-panel-${tab.id}`}
-          aria-labelledby={`review-tab-${tab.id}`}
-          hidden={tab.id !== active}
-          tabIndex={0}
-          className="py-8"
-        >
-          {panels[tab.id]}
-        </div>
-      ))}
+      {panels
+        .filter((panel) => panel.applicable)
+        .map((panel) => (
+          <div
+            key={panel.challenge}
+            role="tabpanel"
+            id={`review-panel-${panel.challenge}`}
+            aria-labelledby={`review-tab-${panel.challenge}`}
+            hidden={panel.challenge !== active}
+            tabIndex={0}
+            className="py-8"
+          >
+            {panel.content}
+          </div>
+        ))}
     </div>
   );
 }

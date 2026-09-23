@@ -197,6 +197,7 @@ export async function getSubmissionDetail(attemptId: string) {
       submittedAt: true,
       autoSubmitted: true,
       startedAt: true,
+      chosenTrack: true,
       participant: {
         select: {
           idCardEncrypted: true,
@@ -204,33 +205,51 @@ export async function getSubmissionDetail(attemptId: string) {
           user: { select: { fullName: true, email: true } },
         },
       },
-      challenge1Items: {
-        orderBy: [{ kind: "asc" }, { position: "asc" }],
+      challenge1Entries: {
+        orderBy: { position: "asc" },
         select: {
           id: true,
-          kind: true,
-          title: true,
-          description: true,
+          bugTitle: true,
+          bugDescription: true,
+          testTitle: true,
+          testDescription: true,
           position: true,
-          updatedAt: true,
+          attachments: {
+            orderBy: [{ slot: "asc" }, { position: "asc" }],
+            select: {
+              id: true,
+              slot: true,
+              originalFilename: true,
+              contentType: true,
+              sizeBytes: true,
+              position: true,
+            },
+          },
         },
       },
-      challenge2: {
-        select: { originalFilename: true, sizeBytes: true, uploadedAt: true },
+      submissions: {
+        select: {
+          challenge: true,
+          fileKey: true,
+          originalFilename: true,
+          sizeBytes: true,
+          uploadedAt: true,
+          githubUrl: true,
+          verifiedPublic: true,
+          answers: true,
+          savedAt: true,
+        },
       },
-      challenge3: { select: { githubUrl: true, verifiedPublic: true } },
       evaluation: {
         select: {
           id: true,
           judgeId: true,
           status: true,
-          scoreC1: true,
-          scoreC2: true,
-          scoreC2Bonus: true,
-          scoreC3: true,
+          bonusPoints: true,
           totalScore: true,
           submittedAt: true,
           judge: { select: { fullName: true } },
+          scores: { select: { criterion: true, score: true } },
         },
       },
     },

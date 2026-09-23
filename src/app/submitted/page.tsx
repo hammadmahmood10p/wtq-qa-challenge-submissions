@@ -29,7 +29,7 @@ export default async function SubmittedPage({
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 h-[420px] opacity-[0.16] blur-[90px]"
-        style={{ background: "var(--aurora-gradient)" }}
+        style={{ background: "var(--brand-gradient)" }}
       />
 
       <div className="border-border bg-surface shadow-(--shadow-raised) relative w-full max-w-md rounded-(--radius-card) border p-8 text-center">

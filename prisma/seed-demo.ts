@@ -85,6 +85,19 @@ async function main() {
     ...PARTICIPANTS.map((p) => p.email),
   ];
 
+  // Evaluations first. `evaluations.judgeId` restricts deletion, so a demo judge who
+  // has been assigned a submission cannot be removed while those rows exist. That is
+  // the right rule — scores must not vanish with a judge — and the application only
+  // ever soft deletes, so it matters here alone.
+  await db.evaluation.deleteMany({
+    where: {
+      OR: [
+        { judge: { email: { in: emails } } },
+        { attempt: { participant: { user: { email: { in: emails } } } } },
+      ],
+    },
+  });
+
   // Replace rather than update, so the passwords printed below are always correct.
   const { count } = await db.user.deleteMany({ where: { email: { in: emails } } });
   if (count) console.log(`Removed ${count} existing demo account(s).`);
