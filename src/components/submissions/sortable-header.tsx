@@ -48,7 +48,10 @@ export function SortableHeader({
         type="button"
         onClick={toggle}
         className={cn(
-          "hover:text-text inline-flex items-center gap-1.5 transition-colors",
+          // `uppercase` is repeated from Th rather than inherited: Tailwind's preflight
+          // sets `text-transform: none` on button, so a sortable heading came out in
+          // sentence case beside its plain neighbours.
+          "hover:text-text inline-flex items-center gap-1.5 uppercase transition-colors",
           active && "text-violet",
         )}
       >
