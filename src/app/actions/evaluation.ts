@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { ChallengeKey } from "@/generated/prisma/enums";
 import { requireRole } from "@/lib/auth";
+import { assignSubmission } from "@/lib/judge-assignment";
 import {
   saveBonus,
   saveChallengeScores,
@@ -62,6 +63,23 @@ export async function unlockEvaluationAction(
   reason: string,
 ): Promise<EvaluationResult> {
   const result = await unlockEvaluation(attemptId, reason, await actor());
+  if (result.ok) refresh(attemptId);
+  return result;
+}
+
+/**
+ * Puts a judge's name against a submission, or takes it off.
+ *
+ * Refreshes the whole table rather than the one row: the point of the name being
+ * there is that the rest of the panel sees it, and a stale list is what causes two
+ * judges to open the same submission.
+ */
+export async function assignSubmissionAction(
+  attemptId: string,
+  judgeId: string | null,
+): Promise<EvaluationResult> {
+  const who = await actor();
+  const result = await assignSubmission(attemptId, judgeId, who);
   if (result.ok) refresh(attemptId);
   return result;
 }

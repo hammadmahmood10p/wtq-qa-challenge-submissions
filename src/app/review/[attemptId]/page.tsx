@@ -10,6 +10,7 @@ import {
 } from "@/components/challenge/challenge23-readonly";
 import { AnswersReadOnly } from "@/components/submissions/answers-readonly";
 import { ChallengeScoreCard } from "@/components/review/challenge-scorecard";
+import { ClaimBar } from "@/components/review/claim-bar";
 import { FinalScoreBar } from "@/components/review/final-score-bar";
 import { ScoringProvider } from "@/components/review/scoring-context";
 import { TotalBanner } from "@/components/review/total-banner";
@@ -187,16 +188,23 @@ export default async function ReviewPage({
         </div>
       </header>
 
-      {!evaluation && (
-        <Alert variant="warning" title="Not assigned to a judge yet">
-          This submission arrived before a judge was available. It is assigned
-          automatically when a judge is approved or opens their queue.
+      {/* Unassigned: a judge can take it from here rather than going back to the
+          list. A super admin is shown the state but not offered the claim — judging is
+          not their job, and they can set any name from the table if they need to. */}
+      {!evaluation && user.role === "JUDGE" && (
+        <ClaimBar attemptId={submission.id} judgeId={user.id} judgeName={user.fullName} />
+      )}
+
+      {!evaluation && user.role === "SUPER_ADMIN" && (
+        <Alert variant="info" title="No judge has taken this yet">
+          Judges pick submissions up from the shared table. You can put a name against
+          this one from Participants Submission Details.
         </Alert>
       )}
 
       {evaluation && !assignedToMe && user.role === "JUDGE" && (
-        <Alert variant="info" title={`Assigned to ${evaluation.judge.fullName}`}>
-          You can read this submission, but only the assigned judge can score it.
+        <Alert variant="info" title={`${evaluation.judge.fullName} is reviewing this`}>
+          You can read this submission, but only the judge who took it can score it.
         </Alert>
       )}
 

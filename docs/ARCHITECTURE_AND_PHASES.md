@@ -170,6 +170,15 @@ With 1000 submissions and a panel of judges, two judges *will* open the same sub
 
 **Recommendation: (a) now, with (b) as a later enhancement** if the panel is large.
 
+> **Superseded, 23 Sep 2026 — the organisers chose a shared worktray.** Submissions
+> arrive unassigned, every judge sees one identical list, and a judge takes a
+> submission by putting their own name in its Judge column; the rest of the panel sees
+> that name on their next refresh. This is neither (a) nor (b): there is no timed claim
+> to expire and nobody hands work out in advance. What survives from (a) is the part
+> that mattered — `UNIQUE(attempt_id)` on `evaluations`, which is still what actually
+> stops two judges scoring one submission, now by settling the race when two of them
+> reach for the same row. Implemented in `src/lib/judge-assignment.ts`.
+
 ### D4 — Judge signup only checks the email domain
 Anyone who can receive `@10pearls.com` mail — or who simply *types* such an address — creates a pending judge account. Super admin approval is the real gate, which is acceptable, but I recommend adding **email verification via one-time code** so the approval queue is not full of typos and impostors. Low cost, high value. Depends on an SMTP decision (**Q4**).
 

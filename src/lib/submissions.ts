@@ -3,15 +3,16 @@ import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import { decryptCnic } from "@/lib/crypto";
 import { db } from "@/lib/db";
+import { maxScoreFor } from "@/lib/scoring";
 import { formatCnic } from "@/lib/normalize";
 
 /**
  * The Participants Submission Details table.
  *
  * One query serving both the judges' screen and the super admin's, because the brief
- * specifies the same columns for both and two implementations would drift. What
- * differs is only the scope — a judge defaults to their own queue — and whether the
- * scoring controls appear, which is decided on the review page.
+ * specifies the same columns for both and two implementations would drift. Judges all
+ * see the same list, in the same order, with the same names against the same rows —
+ * that shared view is what stops two of them opening the same submission.
  */
 
 export const SUBMISSIONS_PAGE_SIZE = 25;
@@ -27,8 +28,6 @@ export interface SubmissionsQuery {
   location: "ALL" | "KARACHI" | "LAHORE" | "ISLAMABAD";
   sort: SubmissionSort;
   dir: SortDirection;
-  /** Set for a judge looking at their own queue. */
-  assignedTo?: string;
 }
 
 export interface SubmissionRow {
@@ -41,6 +40,8 @@ export interface SubmissionRow {
   reviewed: boolean;
   /** Null until a judge submits a final score — the column stays empty before then. */
   totalScore: number | null;
+  /** What this participant's route was out of, so the score reads as 88 / 105. */
+  maxScore: number;
   judgeName: string | null;
   judgeId: string | null;
   assigned: boolean;
@@ -70,10 +71,6 @@ export async function listSubmissions(query: SubmissionsQuery) {
     // Only sealed attempts are reviewable. An expired one counts: it still holds work.
     { state: { in: ["SUBMITTED", "EXPIRED"] } },
   ];
-
-  if (query.assignedTo) {
-    conditions.push({ evaluation: { judgeId: query.assignedTo } });
-  }
 
   if (query.review === "REVIEWED") {
     conditions.push({ evaluation: { status: "SUBMITTED" } });
@@ -116,6 +113,7 @@ export async function listSubmissions(query: SubmissionsQuery) {
         id: true,
         submittedAt: true,
         autoSubmitted: true,
+        chosenTrack: true,
         participant: {
           select: {
             idCardEncrypted: true,
@@ -149,6 +147,7 @@ export async function listSubmissions(query: SubmissionsQuery) {
       reviewed,
       // Empty until the review is finalised, per the brief.
       totalScore: reviewed && evaluation?.totalScore ? Number(evaluation.totalScore) : null,
+      maxScore: maxScoreFor(attempt.chosenTrack),
       judgeName: evaluation?.judge.fullName ?? null,
       judgeId: evaluation?.judgeId ?? null,
       assigned: Boolean(evaluation),
@@ -160,15 +159,6 @@ export async function listSubmissions(query: SubmissionsQuery) {
     total,
     pageCount: Math.max(1, Math.ceil(total / SUBMISSIONS_PAGE_SIZE)),
   };
-}
-
-export async function judgeQueueCounts(judgeId: string) {
-  const [assigned, reviewed] = await Promise.all([
-    db.evaluation.count({ where: { judgeId, status: { not: "SUBMITTED" } } }),
-    db.evaluation.count({ where: { judgeId, status: "SUBMITTED" } }),
-  ]);
-
-  return { assigned, reviewed };
 }
 
 export async function submissionCounts() {

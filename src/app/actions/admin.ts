@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { reopenAttempt, resetAttempt } from "@/lib/attempt-admin";
-import { assignUnassignedSubmissions } from "@/lib/attempt-submit";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth";
 import { encryptCnic, hashCnic } from "@/lib/crypto";
@@ -323,10 +322,11 @@ export async function adminApproveJudge(userId: string): Promise<AdminState> {
     entityId: userId,
   });
 
-  // Judges are often approved after the first participants have finished, and a
-  // submission with no evaluation row is invisible to the judging screens. Closing
-  // the gap here means nobody has to notice it.
-  await assignUnassignedSubmissions();
+  // Nothing to backfill: submissions are not assigned in advance, so a judge
+  // approved late sees the same shared list as everyone else and simply takes work
+  // off it. They do become selectable in the Judge column from this moment.
+  revalidatePath("/judge");
+  revalidatePath("/admin/submissions");
 
   refresh();
   return { ok: true };

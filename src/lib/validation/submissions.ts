@@ -14,7 +14,6 @@ export const submissionsQuerySchema = z.object({
   location: z.enum(["ALL", "KARACHI", "LAHORE", "ISLAMABAD"]).catch("ALL"),
   sort: z.enum(["score", "name", "submitted", "location"]).catch("submitted"),
   dir: z.enum(["asc", "desc"]).catch("desc"),
-  scope: z.enum(["mine", "all"]).catch("mine"),
 });
 
 export type SubmissionsQueryInput = z.infer<typeof submissionsQuerySchema>;
@@ -30,6 +29,5 @@ export function parseSubmissionsQuery(raw: Record<string, string | string[] | un
     location: first("location"),
     sort: first("sort"),
     dir: first("dir"),
-    scope: first("scope"),
   });
 }

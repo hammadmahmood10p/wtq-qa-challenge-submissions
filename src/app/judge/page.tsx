@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { Pagination } from "@/components/admin/pagination";
+import { RefreshButton } from "@/components/submissions/refresh-button";
 import { SubmissionFilters } from "@/components/submissions/submission-filters";
 import { SubmissionsTable } from "@/components/submissions/submissions-table";
 import { Alert } from "@/components/ui/alert";
-import { assignUnassignedSubmissions } from "@/lib/attempt-submit";
 import { requireRole } from "@/lib/auth";
-import { judgeQueueCounts, listSubmissions } from "@/lib/submissions";
+import { listActiveJudges } from "@/lib/judge-assignment";
+import { listSubmissions, submissionCounts } from "@/lib/submissions";
 import { parseSubmissionsQuery } from "@/lib/validation/submissions";
 
 export const metadata: Metadata = { title: "Submissions — WTQ 2026" };
@@ -13,58 +14,54 @@ export const metadata: Metadata = { title: "Submissions — WTQ 2026" };
 /**
  * Participants Submission Details, as a judge sees it.
  *
- * Defaults to this judge's own queue rather than the full list. Submissions are
- * auto-assigned (D3), so there is a right answer to "what should I be working on" and
- * a judge under time pressure should not have to construct it from filters. The whole
- * list is one click away.
+ * One list, identical for every judge. Nothing is assigned in advance: a judge takes a
+ * submission by putting their name in its Judge column, and the rest of the panel sees
+ * that on their next refresh. That is what keeps two people off the same submission —
+ * so the shared, unfiltered view is the feature, not a simplification of one.
  */
 export default async function JudgeSubmissionsPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const user = await requireRole("JUDGE");
-
-  // Catches anything submitted before this judge — or any judge — was approved.
-  await assignUnassignedSubmissions();
+  await requireRole("JUDGE");
 
   const query = parseSubmissionsQuery(await searchParams);
-  const mine = query.scope !== "all";
 
-  const [{ rows, total, pageCount }, counts] = await Promise.all([
-    listSubmissions({ ...query, assignedTo: mine ? user.id : undefined }),
-    judgeQueueCounts(user.id),
+  const [{ rows, total, pageCount }, counts, judges] = await Promise.all([
+    listSubmissions(query),
+    submissionCounts(),
+    listActiveJudges(),
   ]);
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="font-display text-2xl font-bold">Participants Submission Details</h1>
-        <p className="text-muted mt-1 text-sm">
-          {counts.assigned > 0
-            ? `${counts.assigned} submission${counts.assigned === 1 ? "" : "s"} waiting for you, ${counts.reviewed} reviewed.`
-            : counts.reviewed > 0
-              ? `Your queue is clear — ${counts.reviewed} reviewed.`
-              : "Submissions will appear here as participants finish."}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold">Participants Submission Details</h1>
+          <p className="text-muted mt-1 text-sm">
+            {counts.total === 0
+              ? "Submissions will appear here as participants finish."
+              : `${counts.total} submitted · ${counts.reviewed} reviewed · ${counts.unassigned} not yet taken`}
+          </p>
+        </div>
+
+        <RefreshButton />
       </div>
 
-      {counts.assigned === 0 && counts.reviewed === 0 && total === 0 && (
+      {counts.total === 0 && (
         <Alert variant="info" title="Nothing submitted yet">
-          Submissions are assigned to you automatically as participants finish, so there
-          is nothing to pick from a shared list.
+          When submissions arrive, put your name in the Judge column against one to
+          start reviewing it. Everyone else will see that you have taken it.
         </Alert>
       )}
 
-      <SubmissionFilters showScope />
+      <SubmissionFilters />
 
       <SubmissionsTable
         rows={rows}
-        emptyMessage={
-          mine
-            ? "Nothing is assigned to you that matches these filters."
-            : "No submissions match these filters."
-        }
+        judges={judges}
+        emptyMessage="No submissions match these filters."
       />
 
       <Pagination page={query.page} pageCount={pageCount} total={total} noun="submissions" />

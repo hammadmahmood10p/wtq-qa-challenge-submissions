@@ -1,7 +1,9 @@
 import { ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EmptyRow, TableShell, Td, Th, Thead, Tr } from "@/components/ui/table";
+import type { JudgeOption } from "@/lib/judge-assignment";
 import type { SubmissionRow } from "@/lib/submissions";
+import { JudgeSelect } from "./judge-select";
 import { SortableHeader } from "./sortable-header";
 
 const LOCATION_LABELS: Record<string, string> = {
@@ -20,9 +22,12 @@ const LOCATION_LABELS: Record<string, string> = {
 export function SubmissionsTable({
   rows,
   emptyMessage,
+  judges,
 }: {
   rows: SubmissionRow[];
   emptyMessage: string;
+  /** The panel, for the Judge column's dropdown. */
+  judges: JudgeOption[];
 }) {
   return (
     <TableShell>
@@ -78,17 +83,27 @@ export function SubmissionsTable({
               </Td>
 
               {/* Empty before review, per the brief — not a zero, which would read as
-                  a score of nought rather than as an absence. */}
-              <Td className="text-right font-mono tabular-nums">
+                  a score of nought rather than as an absence. Shown against its own
+                  maximum, because 88 means different things out of 105 and out of 60,
+                  and the route the participant took decides which. */}
+              <Td className="text-right font-mono tabular-nums whitespace-nowrap">
                 {row.totalScore === null ? (
                   <span className="text-muted">—</span>
                 ) : (
-                  <span className="font-semibold">{row.totalScore}</span>
+                  <span>
+                    <span className="font-semibold">{row.totalScore}</span>
+                    <span className="text-muted">/{row.maxScore}</span>
+                  </span>
                 )}
               </Td>
 
-              <Td className="whitespace-nowrap">
-                {row.judgeName ?? <span className="text-muted text-xs">Unassigned</span>}
+              <Td>
+                <JudgeSelect
+                  attemptId={row.attemptId}
+                  judgeId={row.judgeId}
+                  judges={judges}
+                  locked={row.reviewed}
+                />
               </Td>
             </Tr>
           ))
