@@ -37,3 +37,13 @@ export function loginRefusalMessage(status: UserStatus): string | null {
   if (status === "ACTIVE") return null;
   return STATUS_MESSAGES[status] ?? FALLBACK;
 }
+
+/**
+ * Shown when a super admin has closed participant logins for everyone.
+ *
+ * Phrased as a state of the event rather than a state of the account, because that is
+ * what it is — nothing is wrong with the person reading it, and telling them their
+ * account is blocked would send them to the help desk for no reason.
+ */
+export const PARTICIPANT_LOGINS_CLOSED =
+  "Participant logins are closed at the moment. Please check with the Women Tech Quest organising team.";

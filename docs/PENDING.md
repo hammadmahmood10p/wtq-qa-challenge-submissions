@@ -32,6 +32,8 @@ it is marked *post-event*.
 | **Q13** | Mask the CNIC from judges (`42101*****678`)? | `maskCnic()` exists and is unused. Currently judges would see it in full, per the brief |
 | **D8 numbers** | Caps of 50 bug reports, 50 test cases, 200-character titles, 5000-character descriptions | As listed. Generous enough that nobody writing in good faith meets them |
 | **Tabs** | The brief says clicking a challenge tab opens its submission page in a new browser tab. Taken literally that navigates away from the workspace and takes the clock with it | Tab shows the details; an explicit link opens the submission page in a new tab |
+| **Reopen clock** | A reopened attempt gets a fresh window the admin types in, prefilled with what was left at submission. It does not resume a paused clock, because nothing pauses | Admin decides, 5–240 minutes. Sensible for a mis-submission and for a laptop that died, which need different amounts |
+| **Reattempt keeps nothing** | Clearing an attempt for a fresh run deletes the first submission outright — one attempt row per participant, so there is nowhere to archive it | Confirmed by the organisers. If the old work ever needs keeping, that is a schema change to multiple attempts per participant |
 
 ---
 

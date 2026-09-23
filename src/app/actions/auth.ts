@@ -3,7 +3,11 @@
 import { redirect } from "next/navigation";
 import { audit } from "@/lib/audit";
 import { HOME_FOR_ROLE } from "@/lib/auth";
-import { INVALID_CREDENTIALS, loginRefusalMessage } from "@/lib/auth-messages";
+import {
+  INVALID_CREDENTIALS,
+  PARTICIPANT_LOGINS_CLOSED,
+  loginRefusalMessage,
+} from "@/lib/auth-messages";
 import { db } from "@/lib/db";
 import { fakeVerify, hashPassword, verifyPassword } from "@/lib/password";
 import { LIMITS, accountRateLimitKey, rateLimit, rateLimitByIp } from "@/lib/rate-limit";
@@ -13,6 +17,7 @@ import {
   getSessionUser,
   revokeAllSessions,
 } from "@/lib/session";
+import { participantLoginsDisabled } from "@/lib/settings";
 import { findUserByIdentifier } from "@/lib/user-lookup";
 import { changePasswordSchema, loginSchema } from "@/lib/validation/login";
 
@@ -91,6 +96,21 @@ export async function login(_prev: AuthState, formData: FormData): Promise<AuthS
     });
 
     return { message: refusal };
+  }
+
+  // Checked after the password, for the same reason the status refusals are: before
+  // it, this would tell anyone typing a guess whether the account is a participant.
+  if (user.role === "PARTICIPANT" && (await participantLoginsDisabled())) {
+    await audit({
+      action: "auth.login_failed",
+      actorId: user.id,
+      actorRole: user.role,
+      entityType: "user",
+      entityId: user.id,
+      metadata: { reason: "participant_logins_disabled" },
+    });
+
+    return { message: PARTICIPANT_LOGINS_CLOSED };
   }
 
   await createSession(user.id);

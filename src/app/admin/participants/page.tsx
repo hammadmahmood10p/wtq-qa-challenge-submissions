@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { AddPersonDialog } from "@/components/admin/add-person-dialog";
 import { Pagination } from "@/components/admin/pagination";
+import { ParticipantAccessControls } from "@/components/admin/participant-access";
 import { RosterFilters } from "@/components/admin/roster-filters";
 import { RowActions } from "@/components/admin/row-actions";
 import { StatusBadge } from "@/components/ui/badge";
 import { EmptyRow, TableShell, Td, Th, Thead, Tr } from "@/components/ui/table";
 import { requireRole } from "@/lib/auth";
 import { listParticipants } from "@/lib/roster";
+import { participantLoginsDisabled } from "@/lib/settings";
 import { rosterQuerySchema } from "@/lib/validation/admin";
 
 export const metadata: Metadata = { title: "Manage Participants — WTQ 2026" };
@@ -42,17 +44,24 @@ export default async function ParticipantsPage({
     page: typeof raw.page === "string" ? raw.page : undefined,
   });
 
-  const { rows, total, pageCount } = await listParticipants(query);
+  const [{ rows, total, pageCount }, loginsDisabled] = await Promise.all([
+    listParticipants(query),
+    participantLoginsDisabled(),
+  ]);
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold">Manage Participants</h1>
-          <p className="text-muted mt-1 text-sm">Add, block or remove participants.</p>
+          <p className="text-muted mt-1 text-sm">
+            Add, block or remove participants, and reopen or clear a submitted attempt.
+          </p>
         </div>
         <AddPersonDialog kind="participant" />
       </div>
+
+      <ParticipantAccessControls disabled={loginsDisabled} />
 
       <RosterFilters
         statuses={STATUSES}
@@ -90,6 +99,13 @@ export default async function ParticipantsPage({
                 </Td>
                 <Td>
                   <StatusBadge status={row.status} />
+                  {/* An attempt handed back reads as ACTIVE, which on its own hides the
+                      fact that a submission is currently withheld from judging. */}
+                  {row.attempt?.reopenedAt && (
+                    <span className="text-warning mt-1 block text-[11px]">
+                      Reopened — awaiting resubmission
+                    </span>
+                  )}
                 </Td>
                 <Td>
                   <RowActions
@@ -97,6 +113,7 @@ export default async function ParticipantsPage({
                     fullName={row.fullName}
                     status={row.status}
                     kind="participant"
+                    attempt={row.attempt}
                   />
                 </Td>
               </Tr>

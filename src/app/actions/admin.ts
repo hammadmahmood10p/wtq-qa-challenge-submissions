@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { reopenAttempt, resetAttempt } from "@/lib/attempt-admin";
 import { assignUnassignedSubmissions } from "@/lib/attempt-submit";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth";
@@ -9,6 +10,10 @@ import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
 import { signupConflictField } from "@/lib/prisma-errors";
 import { revokeAllSessions } from "@/lib/session";
+import {
+  PARTICIPANT_LOGINS_DISABLED,
+  setParticipantLoginsDisabled,
+} from "@/lib/settings";
 import { formatTempPassword, generateTempPassword } from "@/lib/temp-password";
 import { adminCreateJudgeSchema, adminCreateParticipantSchema } from "@/lib/validation/admin";
 
@@ -349,4 +354,106 @@ export async function adminRejectJudge(userId: string): Promise<AdminState> {
 
   refresh();
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Undoing a sealed attempt
+// ---------------------------------------------------------------------------
+
+/**
+ * Hands a submitted attempt back so the participant can carry on where they stopped.
+ *
+ * Their saved work is untouched; only the clock and the lock change. While it is open
+ * again the submission is out of every judging queue, and submitting a second time
+ * overwrites the first in place — there is one attempt row per participant, so a
+ * duplicate is not something the schema can express.
+ */
+export async function adminReopenAttempt(
+  participantId: string,
+  minutes: number,
+): Promise<AdminState> {
+  const admin = await requireRole("SUPER_ADMIN");
+
+  const result = await reopenAttempt(participantId, { minutes, adminId: admin.id });
+  if (!result.ok) return { message: result.message };
+
+  refresh();
+  revalidatePath("/admin/submissions");
+  revalidatePath("/judge");
+  return { ok: true };
+}
+
+/**
+ * Clears a submitted attempt so the participant starts again from nothing.
+ *
+ * Destructive and not recoverable: their findings, evidence, uploads, links, answers
+ * and any scoring are deleted. The confirmation in the interface spells that out,
+ * because from the roster this looks a lot like reopening and is not.
+ */
+export async function adminResetAttempt(participantId: string): Promise<AdminState> {
+  const admin = await requireRole("SUPER_ADMIN");
+
+  const result = await resetAttempt(participantId, { adminId: admin.id });
+  if (!result.ok) return { message: result.message };
+
+  refresh();
+  revalidatePath("/admin/submissions");
+  revalidatePath("/judge");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// The participant login gate
+// ---------------------------------------------------------------------------
+
+/**
+ * Opens or closes participant logins for everyone at once.
+ *
+ * Deliberately does not touch anybody's session: someone already working carries on,
+ * and their three hours are not disturbed by an administrative decision about the
+ * front door. Signing people out is a separate, separately confirmed action.
+ */
+export async function adminSetParticipantLogins(disabled: boolean): Promise<AdminState> {
+  const admin = await requireRole("SUPER_ADMIN");
+
+  await setParticipantLoginsDisabled(disabled);
+
+  await audit({
+    action: disabled ? "admin.participant_logins_disabled" : "admin.participant_logins_enabled",
+    actorId: admin.id,
+    actorRole: "SUPER_ADMIN",
+    entityType: "setting",
+    entityId: PARTICIPANT_LOGINS_DISABLED,
+  });
+
+  refresh();
+  return { ok: true };
+}
+
+/**
+ * Signs every participant out, everywhere, at once.
+ *
+ * The emergency stop. Saved work survives — everything autosaves — but anything typed
+ * and not yet saved is lost, and attempt clocks keep running, so this is not a pause.
+ * Judges and admins are untouched: whatever went wrong, the people fixing it need to
+ * stay logged in.
+ */
+export async function adminSignOutAllParticipants(): Promise<AdminState> {
+  const admin = await requireRole("SUPER_ADMIN");
+
+  const { count } = await db.session.updateMany({
+    where: { revokedAt: null, user: { role: "PARTICIPANT" } },
+    data: { revokedAt: new Date() },
+  });
+
+  await audit({
+    action: "admin.participants_signed_out",
+    actorId: admin.id,
+    actorRole: "SUPER_ADMIN",
+    entityType: "session",
+    metadata: { sessionsRevoked: count },
+  });
+
+  refresh();
+  return { ok: true, message: `Signed out ${count} participant session(s).` };
 }

@@ -16,10 +16,19 @@ const PHASE_COLOR: Record<TimerPhase, string> = {
   expired: "var(--timer-critical)",
 };
 
+/**
+ * Phrased as bounds, not as readings.
+ *
+ * These label a phase the clock has entered, not the time on it. During a normal run
+ * they coincide, because the phase changes exactly as the countdown passes each mark.
+ * A reopened attempt starts wherever the admin set it — twenty-five minutes, say —
+ * so "30 minutes remaining" sat above a clock reading 00:24:37. "Under 30 minutes"
+ * is true in both cases.
+ */
 const PHASE_LABEL: Record<TimerPhase, string> = {
   calm: "Time remaining",
-  caution: "30 minutes remaining",
-  warning: "10 minutes remaining",
+  caution: "Under 30 minutes remaining",
+  warning: "Under 10 minutes remaining",
   critical: "Less than 5 minutes remaining",
   expired: "Time is up",
 };

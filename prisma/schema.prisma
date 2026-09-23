@@ -185,6 +185,18 @@ model Attempt {
   chosenTrack   ChallengeTrack?
   chosenTrackAt DateTime?
 
+  /// Super-admin interventions on a sealed attempt.
+  ///
+  /// `reopenedAt` is set when an attempt is handed back to the participant to carry on
+  /// with, and cleared when they submit again — so it reads as "this submission is
+  /// currently withdrawn from judging", which is exactly what it means. The counters
+  /// stay, because someone looking at an unusual result a week later should be able to
+  /// see that the attempt was interrupted without digging through the audit log.
+  reopenedAt  DateTime?
+  reopenCount Int       @default(0)
+  /// Incremented when the attempt is wiped for a fresh run. The work itself is gone.
+  resetCount  Int       @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

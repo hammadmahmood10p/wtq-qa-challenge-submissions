@@ -58,14 +58,21 @@ export async function finalizeAttempt(
     // one sealed attempt and one evaluation.
     const { count } = await tx.attempt.updateMany({
       where: { participantId, state: "IN_PROGRESS" },
-      data: { state: "SUBMITTED", submittedAt: new Date(), autoSubmitted: options.auto },
+      data: {
+        state: "SUBMITTED",
+        submittedAt: new Date(),
+        autoSubmitted: options.auto,
+        // If this attempt had been handed back by an admin, it is no longer withdrawn:
+        // the replacement work has arrived and judging can see it again.
+        reopenedAt: null,
+      },
     });
 
     if (count === 0) return { changed: false, assignedJudgeId: null };
 
     const attempt = await tx.attempt.findUniqueOrThrow({
       where: { participantId },
-      select: { id: true },
+      select: { id: true, evaluation: { select: { id: true, judgeId: true } } },
     });
 
     // Requirement 5: the account is closed. They cannot log in again.
@@ -80,6 +87,19 @@ export async function finalizeAttempt(
       where: { userId: participantId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+
+    // An attempt a super admin handed back already has an evaluation, with its scores
+    // cleared at the moment it was reopened. Creating a second one is impossible —
+    // UNIQUE(attemptId) — and picking a different judge would be wrong anyway: the
+    // replacement work belongs with whoever was already reading this person's.
+    if (attempt.evaluation) {
+      await tx.evaluation.update({
+        where: { id: attempt.evaluation.id },
+        data: { status: "ASSIGNED", assignedAt: new Date(), claimedAt: null },
+      });
+
+      return { changed: true, assignedJudgeId: attempt.evaluation.judgeId };
+    }
 
     const judgeId = await pickJudge(tx);
 

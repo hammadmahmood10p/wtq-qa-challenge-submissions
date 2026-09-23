@@ -1,4 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client";
+import type { AttemptState } from "@/generated/prisma/enums";
+import { remainingMinutesAtSubmit } from "@/lib/attempt-admin-limits";
 import { decryptCnic, hashCnic } from "@/lib/crypto";
 import { db } from "@/lib/db";
 import { detectIdentifier, formatCnic, formatPhone } from "@/lib/normalize";
@@ -27,6 +29,22 @@ export interface RosterRow {
   phone?: string;
   location?: string;
   approvedAt?: Date | null;
+
+  /**
+   * The participant's run, where there is one. The roster is where a super admin
+   * decides whether to hand an attempt back or clear it, and neither decision can be
+   * made from the account status alone: SUBMITTED_LOCKED says they finished, not what
+   * state their work is in or how much of their clock they had left.
+   */
+  attempt?: {
+    state: AttemptState;
+    /** Minutes left when it sealed; null if it ran out of time instead. */
+    remainingMinutes: number | null;
+    reopenCount: number;
+    resetCount: number;
+    /** Set while an admin has handed it back and it has not been resubmitted. */
+    reopenedAt: Date | null;
+  } | null;
 }
 
 function searchWhere(q: string | undefined): Prisma.UserWhereInput | null {
@@ -86,7 +104,21 @@ export async function listParticipants(query: RosterQuery) {
         createdAt: true,
         lastLoginAt: true,
         participantProfile: {
-          select: { idCardEncrypted: true, phoneE164: true, location: true },
+          select: {
+            idCardEncrypted: true,
+            phoneE164: true,
+            location: true,
+            attempt: {
+              select: {
+                state: true,
+                endsAt: true,
+                submittedAt: true,
+                reopenedAt: true,
+                reopenCount: true,
+                resetCount: true,
+              },
+            },
+          },
         },
       },
     }),
@@ -106,6 +138,15 @@ export async function listParticipants(query: RosterQuery) {
       : undefined,
     phone: u.participantProfile ? formatPhone(u.participantProfile.phoneE164) : undefined,
     location: u.participantProfile?.location,
+    attempt: u.participantProfile?.attempt
+      ? {
+          state: u.participantProfile.attempt.state,
+          remainingMinutes: remainingMinutesAtSubmit(u.participantProfile.attempt),
+          reopenCount: u.participantProfile.attempt.reopenCount,
+          resetCount: u.participantProfile.attempt.resetCount,
+          reopenedAt: u.participantProfile.attempt.reopenedAt,
+        }
+      : null,
   }));
 
   return { rows, total, pageCount: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
