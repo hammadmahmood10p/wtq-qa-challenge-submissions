@@ -9,13 +9,16 @@ import {
   Challenge3ReadOnly,
 } from "@/components/challenge/challenge23-readonly";
 import { AnswersReadOnly } from "@/components/submissions/answers-readonly";
+import { ChallengeScoreCard } from "@/components/review/challenge-scorecard";
+import { FinalScoreBar } from "@/components/review/final-score-bar";
+import { ScoringProvider } from "@/components/review/scoring-context";
+import { TotalBanner } from "@/components/review/total-banner";
 import { ReviewTabs, type ReviewPanel } from "@/components/submissions/review-tabs";
 import { Alert } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { requireRole } from "@/lib/auth";
 import { CHALLENGES, challengeById } from "@/lib/challenge-content";
 import { getSubmissionDetail } from "@/lib/submissions";
-import { maxScoreFor } from "@/lib/scoring";
+
 
 export const metadata: Metadata = { title: "Review submission — WTQ 2026" };
 
@@ -47,9 +50,16 @@ export default async function ReviewPage({
   if (!submission) notFound();
 
   const evaluation = submission.evaluation;
-  const reviewed = evaluation?.status === "SUBMITTED";
   const assignedToMe = evaluation?.judgeId === user.id;
   const track = submission.chosenTrack;
+
+  // A judge may score only their own assignment; a super admin is the escalation path
+  // and may score any of them. The server enforces both — this only decides whether
+  // the fields are drawn as editable.
+  const canScore = Boolean(evaluation) && (user.role === "SUPER_ADMIN" || assignedToMe);
+
+  const initialScores: Record<string, number> = {};
+  for (const row of evaluation?.scores ?? []) initialScores[row.criterion] = Number(row.score);
 
 
   const byChallenge = new Map(submission.submissions.map((s) => [s.challenge, s]));
@@ -114,7 +124,14 @@ export default async function ReviewPage({
       label: `Task ${challenge.number}`,
       sub: challenge.title,
       applicable,
-      content,
+      content: (
+        <>
+          {/* Above the submission, not below it: the score is why the judge is here,
+              and Challenge 1 can run to dozens of findings. */}
+          {evaluation && <ChallengeScoreCard challenge={challenge.id} />}
+          {content}
+        </>
+      ),
     };
   });
 
@@ -122,7 +139,16 @@ export default async function ReviewPage({
   const chosen = track ? challengeById(track) : null;
 
   return (
-    <div className="space-y-6">
+    <ScoringProvider
+      attemptId={submission.id}
+      track={track}
+      status={evaluation?.status ?? "ASSIGNED"}
+      canScore={canScore}
+      canUnlock={user.role === "SUPER_ADMIN"}
+      initialScores={initialScores}
+      initialBonus={evaluation?.bonusPoints === null || evaluation?.bonusPoints === undefined ? null : Number(evaluation.bonusPoints)}
+    >
+      <div className="space-y-6">
       <Link
         href={backHref}
         className="text-muted hover:text-text inline-flex items-center gap-1.5 text-sm transition-colors"
@@ -157,22 +183,7 @@ export default async function ReviewPage({
           </div>
 
           {/* Requirement 5 for judges: the total sits at the top and starts at zero. */}
-          <div className="text-right">
-            <p className="text-muted font-mono text-[10px] tracking-[0.18em] uppercase">
-              Total score
-            </p>
-            <p className="font-display tabular mt-1 text-4xl font-bold">
-              {evaluation?.totalScore ? Number(evaluation.totalScore) : 0}
-              <span className="text-muted ml-1 text-lg font-normal">/ {maxScoreFor(track)}</span>
-            </p>
-            <div className="mt-2 flex justify-end">
-              {reviewed ? (
-                <Badge className="border-success/30 bg-success/10 text-success">Reviewed</Badge>
-              ) : (
-                <Badge>Not reviewed</Badge>
-              )}
-            </div>
-          </div>
+          <TotalBanner />
         </div>
       </header>
 
@@ -190,6 +201,9 @@ export default async function ReviewPage({
       )}
 
       <ReviewTabs panels={panels} />
-    </div>
+
+      {evaluation && <FinalScoreBar judgeName={evaluation.judge.fullName} />}
+      </div>
+    </ScoringProvider>
   );
 }
