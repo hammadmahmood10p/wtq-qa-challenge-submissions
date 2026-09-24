@@ -22,7 +22,9 @@ sessions are in Postgres; scheduled work is resolved on read rather than by a cr
 
 **Three things must be provisioned:**
 
-1. A PostgreSQL 16 database, with a **pooled** connection endpoint.
+1. A PostgreSQL 16+ database, as close to the application as possible — ideally on the
+   same private network. Self-hosting is the chosen route; see
+   [DATABASE_MIGRATION.md](./DATABASE_MIGRATION.md).
 2. Object storage — S3-compatible or Azure Blob.
 3. A host that can run Node 20.9+ and hold environment variables secretly.
 
@@ -30,13 +32,18 @@ sessions are in Postgres; scheduled work is resolved on read rather than by a cr
 
 ## 2. Before you deploy anything
 
-- [ ] **Database region matches the application region.** Measured from Pakistan
-      against a US database, every query costs 200–280 ms; the portal makes several
-      per page. Put both in the same region, as close to Pakistan as the provider
-      offers. Changing this after participants have registered means a data
-      migration — see R1b in [DELIVERY_PLAN.md](./DELIVERY_PLAN.md).
-- [ ] **`DATABASE_URL` is the pooled endpoint.** A direct connection will exhaust the
-      server's connection limit under a thousand concurrent participants.
+- [ ] **The database sits next to the application.** Measured from Pakistan against a
+      US-hosted database, every query costs 200–280 ms, and the portal makes several
+      per page — latency between the app and the database is paid once per query, not
+      once per page. A database on the same private network answers in 1–3 ms. A
+      self-hosted server alongside the app satisfies this by construction; a managed
+      one must be in the same region. See R1b in
+      [DELIVERY_PLAN.md](./DELIVERY_PLAN.md).
+- [ ] **Connection capacity is sized against the instance count.** The application caps
+      itself at **10 connections per process** (`src/lib/db.ts`), so the database sees
+      instances × 10. On a managed provider, use the **pooled** endpoint. On a
+      self-hosted server, set `max_connections = 200` and check the arithmetic — see §2
+      of [DATABASE_MIGRATION.md](./DATABASE_MIGRATION.md).
 - [ ] **`STORAGE_DRIVER` is `s3` or `azure`.** The `local` driver is refused in
       production, and rightly: on a multi-instance deployment each instance has its
       own disk, so an upload written by one is invisible to the others and does not
@@ -57,8 +64,8 @@ Set these on the host. Never commit them.
 
 | Variable | Value |
 |---|---|
-| `DATABASE_URL` | **Pooled** Postgres connection string, with `sslmode=require` |
-| `DIRECT_DATABASE_URL` | **Direct** connection string. Used only by the migration step |
+| `DATABASE_URL` | Postgres connection string used by the app. The **pooled** endpoint if there is a pooler; otherwise the same as below |
+| `DIRECT_DATABASE_URL` | Connection string for the migration step. Must **not** go through a pooler. Identical to the above when there is none |
 | `SESSION_SECRET` | ≥32 chars. `pnpm gen:secrets` |
 | `CNIC_PEPPER` | ≥16 chars. `pnpm gen:secrets` |
 | `CNIC_ENCRYPTION_KEY` | Exactly 32 bytes, base64. `pnpm gen:secrets` |
@@ -265,10 +272,15 @@ Worth alerting on, for event day:
 
 ## 8. Backups
 
+> On a **self-hosted** database none of this is automatic. Points 1 and 2 below
+> describe what a managed provider does for you; on your own server they are jobs with
+> an owner. See §6 of [DATABASE_MIGRATION.md](./DATABASE_MIGRATION.md).
+
 Before the event:
 
-1. Turn on **point-in-time recovery** at the database provider, with a retention
-   window covering the whole event weekend.
+1. Turn on **point-in-time recovery** — at the provider, or via WAL archiving on a
+   self-hosted server — with a retention window covering the whole event weekend. At
+   minimum, a nightly `pg_dump` written somewhere that is not the database server.
 2. Take a manual snapshot immediately before registration opens, and another
    immediately before the challenge starts.
 3. **Restore one of them into a scratch database and check it.** A backup nobody has
@@ -303,7 +315,7 @@ deployment specifically.
 | # | What is needed | Why it blocks |
 |---|---|---|
 | **P3** | The deployment target | Everything in §5 depends on it |
-| **P4** | Database region, once P3 is known | Recreating it later means migrating live data |
+| **P4** | Database region, once P3 is known | Recreating it later means migrating live data. *Largely answered: the decision is a self-hosted PostgreSQL alongside the application, which closes R1b* |
 | **P1** | The public URL of the application under test | Participants cannot start Challenge 1 without it |
 | **P2** | The Challenge 4 CSV | Same, for Challenge 4 |
 

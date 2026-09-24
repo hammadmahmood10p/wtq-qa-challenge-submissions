@@ -64,9 +64,50 @@ git checkout develop
 
 ## 3. Get a PostgreSQL 16 database
 
-Any Postgres 16 works — nothing in the code is vendor-specific. Pick one route.
+Any Postgres 16 or newer works — nothing in the code is vendor-specific. Pick one
+route.
 
-### Route A — Neon (fastest, free, no card)
+> The project is moving to a **self-hosted PostgreSQL** for development and production
+> alike. Route A is the target. The hosted route is kept because it is still the
+> fastest way to get going if you have no Postgres to hand. See
+> [DATABASE_MIGRATION.md](./DATABASE_MIGRATION.md).
+
+### Route A — PostgreSQL on your own machine (the target setup)
+
+**Windows** — install from <https://www.postgresql.org/download/windows/>, keep port
+5432, tick **Command Line Tools**, and add the install's `bin` directory to `PATH`
+(typically under `C:/Program Files/PostgreSQL/17/bin`).
+
+**macOS** — `brew install postgresql@17 && brew services start postgresql@17`
+
+**Linux** — `sudo apt install -y postgresql-17 && sudo systemctl enable --now postgresql`
+
+Then create a database and a role for the application, rather than letting it connect
+as the superuser:
+
+```sql
+CREATE ROLE wtq_app WITH LOGIN PASSWORD 'choose-one';
+CREATE DATABASE wtq2026 OWNER wtq_app;
+```
+
+Both URLs take the same value, because a plain server has no pooler:
+
+```
+postgresql://wtq_app:choose-one@localhost:5432/wtq2026
+```
+
+### Route B — Docker
+
+```bash
+docker run --name wtq-postgres \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=wtq2026 \
+  -p 5432:5432 -v wtq-pgdata:/var/lib/postgresql/data -d postgres:17
+```
+
+Connection string: `postgresql://postgres:postgres@localhost:5432/wtq2026`. The named
+volume is what stops the data vanishing when the container is replaced.
+
+### Route C — Neon (hosted, free, no install)
 
 1. Sign up at <https://neon.tech> and create a project. Choose a region near you.
 2. On the project dashboard, open **Connection string**.
@@ -76,33 +117,13 @@ Any Postgres 16 works — nothing in the code is vendor-specific. Pick one route
 
 If the dashboard only shows one, toggle *Connection pooling* to reveal the other.
 
-### Route B — Postgres on your own machine
-
-Install PostgreSQL 16, then:
-
-```bash
-createdb wtq2026
-```
-
-Your connection string is something like
-`postgresql://postgres:yourpassword@localhost:5432/wtq2026`. Use the **same value**
-for both `DATABASE_URL` and `DIRECT_DATABASE_URL` — a local server has no pooler.
-
-### Route C — Docker
-
-```bash
-docker run --name wtq-postgres -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=wtq2026 -p 5432:5432 -d postgres:16
-```
-
-Connection string: `postgresql://postgres:postgres@localhost:5432/wtq2026`.
-
-> **Why two URLs?** The running app must use a *pooled* connection or a thousand
-> concurrent participants will exhaust the database's connection limit. Schema
-> migrations cannot run through a pooler, because it rewrites and multiplexes
-> statements — so the Prisma CLI uses the direct one. Locally they are usually
-> identical, which is exactly why this is easy to get wrong later. See R1 in
-> [DELIVERY_PLAN.md](./DELIVERY_PLAN.md).
+> **Why two URLs?** Schema migrations cannot run through a connection pooler, because
+> a pooler rewrites and multiplexes statements — so the Prisma CLI gets its own direct
+> string. **With no pooler in front of the database, both values are simply the same**,
+> which is the case for a self-hosted server. The split only starts to matter if
+> PgBouncer is put in front of it later. See R1 in
+> [DELIVERY_PLAN.md](./DELIVERY_PLAN.md) and §2 of
+> [DATABASE_MIGRATION.md](./DATABASE_MIGRATION.md).
 
 ---
 
@@ -394,6 +415,7 @@ Clone somewhere with a plain path.
 | Document | What it covers |
 |---|---|
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | Getting this into production |
+| [DATABASE_MIGRATION.md](./DATABASE_MIGRATION.md) | Moving from hosted Postgres to a self-hosted one |
 | [ARCHITECTURE_AND_PHASES.md](./ARCHITECTURE_AND_PHASES.md) | The data model and the decisions behind it |
 | [DELIVERY_PLAN.md](./DELIVERY_PLAN.md) | Schedule, risks, freeze dates |
 | [PENDING.md](./PENDING.md) | What is still open, and what is known to be imperfect |

@@ -35,6 +35,7 @@ To deploy rather than develop, read [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 |---|---|
 | [SETUP.md](docs/SETUP.md) | Running it locally, from a clean machine |
 | [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Putting it into production |
+| [DATABASE_MIGRATION.md](docs/DATABASE_MIGRATION.md) | Moving from hosted Postgres to a self-hosted one |
 | [ARCHITECTURE_AND_PHASES.md](docs/ARCHITECTURE_AND_PHASES.md) | The data model and the decisions behind it |
 | [DELIVERY_PLAN.md](docs/DELIVERY_PLAN.md) | Schedule, risks and freeze dates |
 | [PENDING.md](docs/PENDING.md) | What is still open, and what is knowingly imperfect |

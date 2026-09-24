@@ -171,6 +171,17 @@ If any weekend time becomes available, that is where it goes.
 
 **Mitigation:** once IT answers R0, recreate the Neon project in the matching region. A Neon project cannot be moved between regions — it has to be recreated — so this is a two-minute job **now, while the database holds nothing but a seeded admin**, and a painful one after 1000 people have registered. Do it before participant registration opens.
 
+> **R1/R1b update, 24 Sep 2026 — moving to a self-hosted PostgreSQL.** The organisers
+> have chosen to run Postgres themselves, on the same network as the application, for
+> development and production alike. This **closes R1b**: the 205–280 ms round trip
+> becomes 1–3 ms, and since every query holds a pool connection for its duration, each
+> connection serves roughly a hundred times more requests per second. It also reduces
+> R1 — with the application capped at 10 connections per process, a default server
+> limit is not the binding constraint a pooler was protecting against. What the move
+> costs is backups, failover and monitoring, which become ours. Procedure and
+> consequences in [DATABASE_MIGRATION.md](./DATABASE_MIGRATION.md); the Day 12 load
+> test must run against the new topology, because the numbers do not transfer.
+
 **R2 — Judging capacity on the day (§3.4).** The software may work perfectly and the winners still not be decided in time. **Mitigation:** confirm the judging model by 2 Oct.
 
 **R3 — You are a single point of failure.** **Mitigation:** the Day 13 run-book is not optional, and a second person must be walked through the admin console before the 8th.
