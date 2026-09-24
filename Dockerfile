@@ -17,6 +17,26 @@ COPY prisma.config.ts ./
 # Skip the postinstall `prisma generate`; the build stage runs it with the schema present.
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
+# --- migrator --------------------------------------------------------------
+# A separate image for running migrations, because the runtime image cannot.
+#
+# `output: "standalone"` traces only what the server imports, and the Prisma CLI is
+# not one of those things — there is no `prisma` binary in the runtime image and
+# `migrate deploy` cannot be run from it. Rather than bloat the runtime image with a
+# CLI it never uses, migrations get their own target:
+#
+#   docker build --target migrator -t wtq-migrator .
+#   docker run --rm -e DIRECT_DATABASE_URL=… wtq-migrator
+#
+# It needs only the schema and the CLI, not a generated client, which is why it can
+# reuse the --ignore-scripts dependency layer untouched.
+FROM base AS migrator
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY prisma ./prisma
+COPY prisma.config.ts ./
+CMD ["pnpm", "prisma", "migrate", "deploy"]
+
 # --- build -----------------------------------------------------------------
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
@@ -43,10 +63,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Migrations are run as a separate deploy step, not on container start: several
-# instances starting at once must not race each other applying the same migration.
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./
+# Migrations run from the `migrator` target above, as a separate deploy step —
+# several instances starting at once must not race each other applying the same
+# migration, and this image has no Prisma CLI to run one with in any case.
 
 USER nextjs
 EXPOSE 3000
