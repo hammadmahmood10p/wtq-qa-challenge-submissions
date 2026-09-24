@@ -21,6 +21,15 @@ const nextConfig: NextConfig = {
     serverActions: { bodySizeLimit: "25mb" },
   },
 
+  // The dark circle in the bottom-left corner is **Next.js's** dev-tools indicator,
+  // not a database badge — it is the framework's own "N", and it has never appeared
+  // in a production build. Hidden because it was being mistaken for one, and because
+  // it sits on top of the interface during the dress rehearsal.
+  //
+  // Compile and runtime errors are still surfaced; this only removes the badge.
+  // Set it back to `{ position: "bottom-right" }` to get it back while debugging.
+  devIndicators: false,
+
   poweredByHeader: false,
 
   async headers() {
