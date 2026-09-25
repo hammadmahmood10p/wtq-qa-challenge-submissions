@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AddPersonDialog } from "@/components/admin/add-person-dialog";
+import { BulkDeleteDialog } from "@/components/admin/bulk-delete-dialog";
 import { BulkImportDialog } from "@/components/admin/bulk-import-dialog";
 import { PasswordCell, PasswordReveal } from "@/components/admin/password-column";
 import { Pagination } from "@/components/admin/pagination";
@@ -54,6 +55,7 @@ export default async function JudgesPage({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <BulkImportDialog kind="judge" />
+          <BulkDeleteDialog kind="judge" query={query} />
           <AddPersonDialog kind="judge" />
         </div>
       </div>

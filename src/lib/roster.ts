@@ -80,7 +80,14 @@ function searchWhere(q: string | undefined): Prisma.UserWhereInput | null {
   };
 }
 
-export async function listParticipants(query: RosterQuery) {
+/**
+ * The filter behind the participants table.
+ *
+ * Exported because bulk delete has to act on exactly the set the admin is looking at.
+ * Rebuilding these conditions there would mean two definitions of "the current filter"
+ * that could drift apart, and the cost of them drifting is deleting the wrong people.
+ */
+export function participantWhere(query: RosterQuery): Prisma.UserWhereInput {
   const conditions: Prisma.UserWhereInput[] = [{ role: "PARTICIPANT" }];
 
   if (query.status !== "ALL") {
@@ -98,7 +105,11 @@ export async function listParticipants(query: RosterQuery) {
   const search = searchWhere(query.q);
   if (search) conditions.push(search);
 
-  const where: Prisma.UserWhereInput = { AND: conditions };
+  return { AND: conditions };
+}
+
+export async function listParticipants(query: RosterQuery) {
+  const where = participantWhere(query);
 
   const [total, users] = await Promise.all([
     db.user.count({ where }),
@@ -168,7 +179,8 @@ export async function listParticipants(query: RosterQuery) {
   return { rows, total, pageCount: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
 }
 
-export async function listJudges(query: RosterQuery) {
+/** The filter behind the judges table. Exported for the same reason as its sibling. */
+export function judgeWhere(query: RosterQuery): Prisma.UserWhereInput {
   const conditions: Prisma.UserWhereInput[] = [{ role: "JUDGE" }];
 
   if (query.status !== "ALL") {
@@ -186,7 +198,11 @@ export async function listJudges(query: RosterQuery) {
     });
   }
 
-  const where: Prisma.UserWhereInput = { AND: conditions };
+  return { AND: conditions };
+}
+
+export async function listJudges(query: RosterQuery) {
+  const where = judgeWhere(query);
 
   const [total, users] = await Promise.all([
     db.user.count({ where }),

@@ -2,19 +2,22 @@ import { ArrowRight, Gavel, Users } from "lucide-react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { EventConfig } from "@/components/admin/event-config";
+import { MasterPasswordCard } from "@/components/admin/master-password-card";
 import { Alert } from "@/components/ui/alert";
 import { requireRole } from "@/lib/auth";
 import { getApplicationUrl, getChallenge4Csv } from "@/lib/event-config";
+import { masterPasswordState } from "@/lib/master-password";
 import { rosterCounts } from "@/lib/roster";
 
 export const metadata: Metadata = { title: "Super Admin — WTQ 2026" };
 
 export default async function AdminHome() {
   const user = await requireRole("SUPER_ADMIN");
-  const [counts, applicationUrl, csv] = await Promise.all([
+  const [counts, applicationUrl, csv, masterPassword] = await Promise.all([
     rosterCounts(),
     getApplicationUrl(),
     getChallenge4Csv(),
+    masterPasswordState(),
   ]);
 
   const tiles = [
@@ -41,6 +44,8 @@ export default async function AdminHome() {
       )}
 
       <EventConfig applicationUrl={applicationUrl} csv={csv} />
+
+      <MasterPasswordCard state={masterPassword} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {tiles.map((tile) => (

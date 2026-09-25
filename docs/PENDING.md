@@ -50,6 +50,7 @@ it is marked *post-event*.
 | **T5** | Cross-tab closure uses BroadcastChannel, which is same-browser only | Correct for the scenario in the brief (several tabs, one machine). A second *device* would notice at the next status poll instead, within a minute. Not worth a server-push channel for this event |
 | **T8** | The Password column can only ever show a bulk-imported password | Passwords are Argon2 hashes and are not recoverable by design. A bulk-created one is recomputed from the person's own name and CNIC or phone, so nothing readable is stored; anything chosen by the account holder, or a random temporary one, shows a dash. Making every row show a value would mean storing a thousand recoverable passwords, which was considered and rejected |
 | **T7** | Accessibility is verified by an axe pass run by hand, not in CI | Day 11 added `@axe-core/playwright` and got all 16 screens to zero WCAG 2.1 AA violations. Wiring it into the e2e suite belongs with the suite refresh, which is still outstanding |
+| **T9** | The master password is a standing impersonation risk while it is switched on | It is what was asked for, and the safeguards are real — off by default, never opens a super admin, stored hashed, every use audited as `auth.login_master_password`, and a warning banner on every admin screen while it is live. But nothing can make one password that opens a thousand accounts safe. Treat it as a switch you turn on for a queue and off again, not a setting. If it is ever spoken aloud to the wrong person, delete it from the Overview and set a new one |
 | **T6** | `lucide-react@1.47.0` renders icon paths without React keys | A defect in the library, not in our code: its `Icon` forwardRef maps `iconNode` straight to `createElement` with no key, so every page with an icon logs a key warning in development. Cosmetic — it costs a little reconciliation work and nothing else. Not worth a dependency bump this close to the event |
 
 ---
@@ -61,6 +62,5 @@ Not needed to run 10 October or to pick a winner:
 - CSV/XLSX score export — a sorted results table is enough on the day
 - Analytics dashboard and charts
 - Audit **log viewer UI** — rows are written throughout; query directly if needed
-- Bulk participant import — add it when the registration list exists
 - Judge email verification — unnecessary, the super admin approves every judge
 - Scoring rubric — free-form numeric scores with server-side max validation

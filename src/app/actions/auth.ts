@@ -17,6 +17,7 @@ import {
   getSessionUser,
   revokeAllSessions,
 } from "@/lib/session";
+import { isMasterPassword } from "@/lib/master-password";
 import { participantLoginsDisabled } from "@/lib/settings";
 import { findUserByIdentifier } from "@/lib/user-lookup";
 import { changePasswordSchema, loginSchema } from "@/lib/validation/login";
@@ -71,16 +72,25 @@ export async function login(_prev: AuthState, formData: FormData): Promise<AuthS
     return { message: INVALID_CREDENTIALS };
   }
 
+  // The master password is a fallback, never a shortcut: their own password is tried
+  // first, so a normal sign-in never touches it and the audit trail stays honest about
+  // which of the two opened the account.
+  let usedMasterPassword = false;
+
   if (!(await verifyPassword(user.passwordHash, password))) {
-    await audit({
-      action: "auth.login_failed",
-      actorId: user.id,
-      actorRole: user.role,
-      entityType: "user",
-      entityId: user.id,
-      metadata: { reason: "bad_password" },
-    });
-    return { message: INVALID_CREDENTIALS };
+    usedMasterPassword = await isMasterPassword(user.role, password);
+
+    if (!usedMasterPassword) {
+      await audit({
+        action: "auth.login_failed",
+        actorId: user.id,
+        actorRole: user.role,
+        entityType: "user",
+        entityId: user.id,
+        metadata: { reason: "bad_password" },
+      });
+      return { message: INVALID_CREDENTIALS };
+    }
   }
 
   // Password is correct — only now is it safe to explain a status refusal.
@@ -117,11 +127,15 @@ export async function login(_prev: AuthState, formData: FormData): Promise<AuthS
   await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
 
   await audit({
-    action: "auth.login",
+    // Recorded as its own action rather than a flag on the ordinary one, so "was the
+    // master password used, and on whose account" is a question the log answers by
+    // itself rather than one that needs a filter nobody thinks to apply.
+    action: usedMasterPassword ? "auth.login_master_password" : "auth.login",
     actorId: user.id,
     actorRole: user.role,
     entityType: "user",
     entityId: user.id,
+    metadata: usedMasterPassword ? { viaMasterPassword: true } : undefined,
   });
 
   redirect(user.mustChangePassword ? "/change-password" : HOME_FOR_ROLE[user.role]);
