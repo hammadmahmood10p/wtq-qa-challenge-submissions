@@ -6,13 +6,14 @@ import {
   loadChallengePage,
 } from "@/components/challenge/challenge-page-shell";
 import { Alert } from "@/components/ui/alert";
-import { APPLICATION_UNDER_TEST_URL } from "@/lib/challenge-content";
+import { getApplicationUrl } from "@/lib/event-config";
 import { listChallenge1Entries } from "@/lib/challenge1";
 
 export const metadata: Metadata = { title: "Challenge 1 submission — WTQ 2026" };
 
 export default async function Challenge1Page() {
   const { attempt, definition } = await loadChallengePage("C1");
+  const applicationUrl = await getApplicationUrl();
   const entries = await listChallenge1Entries(attempt.id);
 
   return (
@@ -28,9 +29,9 @@ export default async function Challenge1Page() {
         <p className="text-muted mt-2">{definition.summary}</p>
       </header>
 
-      {APPLICATION_UNDER_TEST_URL ? (
+      {applicationUrl ? (
         <a
-          href={APPLICATION_UNDER_TEST_URL}
+          href={applicationUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="border-border bg-surface hover:border-violet/50 inline-flex items-center gap-2 rounded-(--radius-control) border px-4 py-2.5 text-sm font-medium transition-colors"

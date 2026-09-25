@@ -44,12 +44,11 @@ export interface Challenge {
 }
 
 /**
- * Placeholders until the organisers supply them (P1, P2 in docs/PENDING.md).
- * Deliberately obvious: if either reaches a participant it should be unmistakable
- * rather than a plausible-looking dead link.
+ * The application under test and the Challenge 4 CSV used to live here as constants,
+ * which made supplying them a code change and a redeploy. They are now event
+ * configuration a super admin sets from the Overview page, read per request — see
+ * src/lib/event-config.ts.
  */
-export const APPLICATION_UNDER_TEST_URL: string | null = null;
-export const CHALLENGE4_CSV_URL: string | null = null;
 
 const LONG = 4000;
 

@@ -1,4 +1,4 @@
-import { Clock, FileText, Info } from "lucide-react";
+import { Clock, ExternalLink, FileText, Info } from "lucide-react";
 import type { Metadata } from "next";
 import { beginChallenge } from "@/app/actions/attempt";
 import { ChallengeBrief } from "@/components/challenge/challenge-brief";
@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { getAttempt } from "@/lib/attempt";
 import { requireRole } from "@/lib/auth";
 import { AppHeader } from "@/components/app-header";
-import { APPLICATION_UNDER_TEST_URL, CHALLENGES } from "@/lib/challenge-content";
+import { CHALLENGES } from "@/lib/challenge-content";
+import { getApplicationUrl } from "@/lib/event-config";
 
 export const metadata: Metadata = { title: "Challenge briefing — WTQ 2026" };
 
@@ -32,6 +33,7 @@ function formatDuration(minutes: number): string {
 export default async function ChallengeBriefingPage() {
   const user = await requireRole("PARTICIPANT");
   const attempt = await getAttempt(user.id);
+  const applicationUrl = await getApplicationUrl();
 
   const notStarted = attempt.state === "NOT_STARTED";
   const inProgress = attempt.state === "IN_PROGRESS";
@@ -126,11 +128,25 @@ export default async function ChallengeBriefingPage() {
               </ul>
             </section>
 
-            {!APPLICATION_UNDER_TEST_URL && notStarted && (
-              <Alert variant="warning" title="Application link pending">
-                The link to the application you will be testing in Challenge 1 will
-                appear here before the event begins.
-              </Alert>
+            {/* Once the organisers set it, the briefing is where a participant looks
+                for it — before the clock starts, not after. */}
+            {applicationUrl ? (
+              <a
+                href={applicationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="border-border bg-surface shadow-(--shadow-card) hover:border-violet/50 flex items-center gap-2 rounded-(--radius-card) border p-4 text-sm font-medium transition-colors"
+              >
+                <ExternalLink size={15} className="text-violet shrink-0" />
+                Open the application you will be testing
+              </a>
+            ) : (
+              notStarted && (
+                <Alert variant="warning" title="Application link pending">
+                  The link to the application you will be testing will appear here
+                  before the event begins.
+                </Alert>
+              )
             )}
 
             {/* Requirement 2: shown only before the attempt starts. During the test

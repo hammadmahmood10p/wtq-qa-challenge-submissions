@@ -8,12 +8,13 @@ import {
 } from "@/components/challenge/challenge-page-shell";
 import { GithubLinkForm } from "@/components/challenge/github-link-form";
 import { Alert } from "@/components/ui/alert";
-import { CHALLENGE4_CSV_URL } from "@/lib/challenge-content";
+import { getChallenge4Csv } from "@/lib/event-config";
 
 export const metadata: Metadata = { title: "Challenge 4 submission — WTQ 2026" };
 
 export default async function Challenge4Page() {
   const { attempt, definition, open, submission } = await loadChallengePage("C4");
+  const csv = await getChallenge4Csv();
 
   return (
     <ChallengePageChrome
@@ -33,12 +34,13 @@ export default async function Challenge4Page() {
 
       {open && (
         <>
-          {CHALLENGE4_CSV_URL ? (
+          {csv ? (
             <a
-              href={CHALLENGE4_CSV_URL}
+              href="/api/files/challenge4-csv"
               className="border-border bg-surface hover:border-violet/50 inline-flex items-center gap-2 rounded-(--radius-control) border px-4 py-2.5 text-sm font-medium transition-colors"
             >
               Download the test case CSV
+              <span className="text-muted font-mono text-xs">({csv.filename})</span>
             </a>
           ) : (
             <Alert variant="warning" title="CSV pending">

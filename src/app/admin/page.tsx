@@ -1,15 +1,21 @@
 import { ArrowRight, Gavel, Users } from "lucide-react";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { EventConfig } from "@/components/admin/event-config";
 import { Alert } from "@/components/ui/alert";
 import { requireRole } from "@/lib/auth";
+import { getApplicationUrl, getChallenge4Csv } from "@/lib/event-config";
 import { rosterCounts } from "@/lib/roster";
 
 export const metadata: Metadata = { title: "Super Admin — WTQ 2026" };
 
 export default async function AdminHome() {
   const user = await requireRole("SUPER_ADMIN");
-  const counts = await rosterCounts();
+  const [counts, applicationUrl, csv] = await Promise.all([
+    rosterCounts(),
+    getApplicationUrl(),
+    getChallenge4Csv(),
+  ]);
 
   const tiles = [
     { label: "Participants registered", value: counts.participants, href: "/admin/participants" },
@@ -33,6 +39,8 @@ export default async function AdminHome() {
           — they cannot log in until approved.
         </Alert>
       )}
+
+      <EventConfig applicationUrl={applicationUrl} csv={csv} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {tiles.map((tile) => (
@@ -71,9 +79,6 @@ export default async function AdminHome() {
         ))}
       </div>
 
-      <p className="text-muted text-sm">
-        Participants Submission Details arrives on Day 9, once the challenge runtime is in place.
-      </p>
     </div>
   );
 }

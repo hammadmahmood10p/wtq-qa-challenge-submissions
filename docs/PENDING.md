@@ -12,8 +12,8 @@ it is marked *post-event*.
 
 | # | Needed | Where it plugs in | Consequence if it arrives late |
 |---|---|---|---|
-| **P1** | **Application-under-test link** (Challenge 1) | `APPLICATION_UNDER_TEST_URL` in `src/lib/challenge-content.ts` | One constant. The briefing and the Challenge 1 page already show a "link pending" notice instead, so nothing breaks — but Challenge 1 is unusable without it on the day. Also needs to survive 1000 concurrent users, which is not our infrastructure |
-| **P2** | **Challenge 4 CSV** (~20 short test cases) | `CHALLENGE4_CSV_URL` in the same file | One constant plus a download link on the Challenge 4 page |
+| ~~**P1**~~ | ~~The application under test~~ | Super Admin → Overview → Event configuration | **No longer blocking.** The URL is set from the admin console and reaches the briefing, Challenge 1 and Challenge 2 on the next page load — no redeploy, no restart. Still needs the actual address before the event |
+| ~~**P2**~~ | ~~The Challenge 4 CSV~~ | Super Admin → Overview → Event configuration | **No longer blocking.** Uploaded from the admin console, stored in object storage and served through an authorised route. Replacing it takes effect at once. Still needs the actual file |
 | **P3** | **Deployment target** from 10Pearls IT | Environment variables only — the app is host-agnostic by design (§2.1) | Gates the load test and the dress rehearsal, which are worthless run anywhere other than where the event runs. Also gates P4 |
 | **P4** | **Database region**, once P3 is known | Recreate the Neon project in the matching region | Currently us-east-2 (Ohio), ~205–280ms per query from Pakistan. Two minutes now, painful once participants have registered. See R1b |
 | ~~**P5**~~ | ~~Score scale~~ | `src/lib/scoring.ts` | **Closed.** The organisers supplied the full rubric: ten criteria across four challenges, plus a +5 bonus for choosing Challenge 3 that a judge may adjust to −5 |
