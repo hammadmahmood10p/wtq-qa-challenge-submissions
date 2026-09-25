@@ -5,15 +5,18 @@ import { env } from "@/lib/env";
 import type { StorageAdapter } from "./types";
 
 /**
- * Local-disk driver. Development only.
+ * Local-disk driver.
  *
- * Deliberately NOT for production: on a multi-instance deployment each instance would
- * have its own disk, so an upload written by one would be invisible to another, and
- * nothing would survive a redeploy. src/lib/storage/index.ts refuses to select this
- * driver in production for that reason.
+ * The default in development, and permitted in production only where every instance
+ * mounts the same directory — see src/lib/storage/policy.ts, which is where that rule
+ * lives. On a single VM with a bind mount that is the simplest correct answer and has
+ * no extra moving parts; across separate machines it loses uploads silently.
+ *
+ * STORAGE_LOCAL_DIR may be relative (resolved against the working directory) or
+ * absolute, which is what a container bind mount will usually be.
  *
  * "Signed URLs" here are HMACs over the key and expiry, served back by
- * /api/files/local, which mirrors the real drivers closely enough to develop against.
+ * /api/files/local, mirroring what S3 and Azure issue natively.
  */
 export class LocalStorageAdapter implements StorageAdapter {
   private pathFor(key: string) {
@@ -21,8 +24,8 @@ export class LocalStorageAdapter implements StorageAdapter {
     if (key.includes("..")) throw new Error("Invalid storage key");
 
     // turbopackIgnore stops the bundler tracing the whole project into the server
-    // output because of this dynamic path. Safe here: the local driver never runs in
-    // production (see src/lib/storage/index.ts).
+    // output because of this dynamic path. It affects what is bundled, not what runs,
+    // so it stays correct now that this driver may also run in production.
     const root = path.resolve(/* turbopackIgnore: true */ process.cwd(), env.STORAGE_LOCAL_DIR);
     return path.join(root, key);
   }

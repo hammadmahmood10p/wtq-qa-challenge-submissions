@@ -170,7 +170,8 @@ Leave everything else at its default for local work.
 | `CNIC_PEPPER` | HMAC pepper for the ID-card lookup hash |
 | `CNIC_ENCRYPTION_KEY` | AES-256 key (32 bytes, base64) for the stored ID card number |
 | `STORAGE_DRIVER` | `local`, `s3` or `azure`. `local` writes to `.storage/` and is refused in production |
-| `STORAGE_LOCAL_DIR` | Where the local driver writes. Default `.storage` |
+| `STORAGE_LOCAL_DIR` | Where the local driver writes. Default `.storage`. May be absolute, which is what a container mount will be |
+| `STORAGE_LOCAL_SHARED_VOLUME` | Only needed in production. `true` asserts every instance mounts the same directory — see [DEPLOYMENT.md](./DEPLOYMENT.md) §2 |
 | `APP_URL` | Absolute base URL, used when building signed file links |
 | `MAX_UPLOAD_MB` | PDF size cap for Challenge 2. Default 20 |
 | `SEED_SUPER_ADMIN_EMAIL` / `_PASSWORD` | Bootstrap admin. A password change is forced at first login. Omit both and the seed skips creating one |

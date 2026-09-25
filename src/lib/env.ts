@@ -27,6 +27,20 @@ const schema = z.object({
   STORAGE_DRIVER: z.enum(["local", "s3", "azure"]).default("local"),
   STORAGE_LOCAL_DIR: z.string().default(".storage"),
 
+  /**
+   * Permits the local-disk driver in production.
+   *
+   * Named for its precondition rather than for what it switches on, so that setting
+   * it means asserting something: every application instance mounts the *same*
+   * directory. That is true of one VM with a bind mount or a named volume, and false
+   * the moment instances land on different machines — at which point an upload
+   * written by one is invisible to the others and a redeploy loses the lot.
+   */
+  STORAGE_LOCAL_SHARED_VOLUME: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+
   S3_BUCKET: z.string().optional(),
   S3_REGION: z.string().optional(),
   S3_ENDPOINT: z.string().optional(),

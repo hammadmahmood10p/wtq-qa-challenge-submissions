@@ -1,0 +1,91 @@
+# The production stack for a single VM.
+#
+# Deliberately small. The database lives on the host rather than in here — see §2 of
+# docs/DATABASE_MIGRATION.md — because a container is where people lose databases, and
+# the one thing on this VM that cannot be recreated is the data.
+#
+# Uploads go to a named volume shared by every app replica. All replicas run on this
+# one machine and mount the same volume, which is the precondition
+# STORAGE_LOCAL_SHARED_VOLUME asserts (src/lib/storage/policy.ts).
+#
+#   docker compose --env-file production.env up -d --scale app=2
+#
+# Migrations are NOT run here. They are a separate step, before bringing this up:
+#   docker compose --env-file production.env run --rm migrator
+
+services:
+  app:
+    image: wtq-portal:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      target: runner
+    restart: unless-stopped
+    # No published port: nothing reaches the app except through nginx, which is what
+    # terminates TLS. Exposing 3000 on the host would let someone bypass it.
+    expose:
+      - "3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      SESSION_SECRET: ${SESSION_SECRET}
+      CNIC_PEPPER: ${CNIC_PEPPER}
+      CNIC_ENCRYPTION_KEY: ${CNIC_ENCRYPTION_KEY}
+      APP_URL: ${APP_URL}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-20}
+      STORAGE_DRIVER: local
+      STORAGE_LOCAL_DIR: /data/uploads
+      STORAGE_LOCAL_SHARED_VOLUME: "true"
+    volumes:
+      - uploads:/data/uploads
+    # The database is on the host. On Linux this name has to be mapped explicitly;
+    # Docker Desktop provides it already.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  # Run once per deploy, before `up`. Never on container start: several replicas
+  # booting at the same moment must not race each other applying one migration.
+  migrator:
+    image: wtq-migrator:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      target: migrator
+    profiles: ["tools"]
+    environment:
+      DIRECT_DATABASE_URL: ${DIRECT_DATABASE_URL}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/certs:/etc/nginx/certs:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  # Named rather than a bind mount: `docker compose down` leaves it alone, and only an
+  # explicit `down -v` removes it. Every participant's PDF and screenshot is in here.
+  uploads:
+    name: wtq_uploads

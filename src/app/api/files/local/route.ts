@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * Serves objects for the local-disk storage driver, standing in for the signed URLs
- * that S3 and Azure issue natively. Development only — it refuses to run in
- * production, where a real object store must be configured.
+ * that S3 and Azure issue natively. Enabled by the driver rather than by the
+ * environment, so it also serves a single-VM production deployment using local disk.
  *
  * The signature check is the whole point: without it this route would let anyone read
  * any participant's submission by guessing a key.

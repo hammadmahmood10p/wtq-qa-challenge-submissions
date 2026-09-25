@@ -35,6 +35,15 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
+
+# `migrate deploy` needs only the schema, but the first deploy also has to create the
+# bootstrap super admin, and prisma/seed.ts imports the generated client. Generating
+# here writes it into src/generated/prisma, so the same image does both:
+#
+#   docker compose run --rm migrator                          # migrate
+#   docker compose run --rm migrator pnpm tsx prisma/seed.ts  # seed, first deploy only
+RUN pnpm prisma generate
+
 CMD ["pnpm", "prisma", "migrate", "deploy"]
 
 # --- build -----------------------------------------------------------------

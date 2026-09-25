@@ -58,3 +58,8 @@ next-env.d.ts
 /docs/DEMO_ACCOUNTS.md
 # scratch audit + diagnostic scripts (Day 11)
 *.local.mjs
+
+# Production deployment configuration and certificates — never committed.
+production.env
+deploy/certs/*
+!deploy/certs/.gitkeep

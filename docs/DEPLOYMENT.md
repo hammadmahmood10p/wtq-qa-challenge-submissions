@@ -1,344 +1,446 @@
 # Deployment
 
-How to put the portal into production, and what has to be true before you do.
+End-to-end instructions for putting the portal on a fresh VM, and the machine
+specification to ask IT for.
 
-Written for whoever runs the deployment — the 10Pearls IT team or whoever holds the
-hosting account. It assumes no familiarity with the codebase. For running it on your
-own machine, read [SETUP.md](./SETUP.md) instead.
+Written for whoever runs the deployment. It assumes Linux familiarity but no knowledge
+of this codebase. For running it on your own machine, read [SETUP.md](./SETUP.md).
 
----
-
-## 1. What you are deploying
-
-One Node process and one PostgreSQL 16 database.
-
-`next.config.ts` sets `output: "standalone"`, so `pnpm build` produces a
-self-contained server at `.next/standalone/server.js` that bundles only the
-dependencies it actually uses. It runs unchanged on a VM, a container host, Azure App
-Service, AWS, or a managed Node platform.
-
-There is no separate API service, no Redis and no message broker. Rate limiting and
-sessions are in Postgres; scheduled work is resolved on read rather than by a cron.
-
-**Three things must be provisioned:**
-
-1. A PostgreSQL 16+ database, as close to the application as possible — ideally on the
-   same private network. Self-hosting is the chosen route; see
-   [DATABASE_MIGRATION.md](./DATABASE_MIGRATION.md).
-2. Object storage — S3-compatible or Azure Blob.
-3. A host that can run Node 20.9+ and hold environment variables secretly.
+> **Status: not yet rehearsed.** Every command below is written from the actual
+> configuration in this repository, and the application has been run in production mode
+> with this exact storage setup (see §11). But the Docker images have never been built
+> — there is no Docker on the development machine — so treat the first run as the
+> rehearsal it is, and do it well before 10 October. §11 lists precisely what is and is
+> not proven.
 
 ---
 
-## 2. Before you deploy anything
+## 1. The VM to ask IT for
 
-- [ ] **The database sits next to the application.** Measured from Pakistan against a
-      US-hosted database, every query costs 200–280 ms, and the portal makes several
-      per page — latency between the app and the database is paid once per query, not
-      once per page. A database on the same private network answers in 1–3 ms. A
-      self-hosted server alongside the app satisfies this by construction; a managed
-      one must be in the same region. See R1b in
-      [DELIVERY_PLAN.md](./DELIVERY_PLAN.md).
-- [ ] **Connection capacity is sized against the instance count.** The application caps
-      itself at **10 connections per process** (`src/lib/db.ts`), so the database sees
-      instances × 10. On a managed provider, use the **pooled** endpoint. On a
-      self-hosted server, set `max_connections = 200` and check the arithmetic — see §2
-      of [DATABASE_MIGRATION.md](./DATABASE_MIGRATION.md).
-- [ ] **`STORAGE_DRIVER` is `s3` or `azure`.** The `local` driver is refused in
-      production, and rightly: on a multi-instance deployment each instance has its
-      own disk, so an upload written by one is invisible to the others and does not
-      survive a redeploy.
-- [ ] **`CNIC_PEPPER` and `CNIC_ENCRYPTION_KEY` are backed up off the server.**
-      Neither can be regenerated once accounts exist. See §4.
-- [ ] **Production secrets are different from the development ones.**
-- [ ] `pnpm typecheck && pnpm lint && pnpm test && pnpm build` all pass on the commit
-      you are deploying.
+One virtual machine runs everything: nginx, the application, and PostgreSQL.
 
----
+### Specification
 
-## 3. Environment variables
+| | Minimum | **Recommended** | Why |
+|---|---|---|---|
+| vCPU | 4 | **8** | Server-rendering is CPU-bound and single-threaded per process. The stack runs one app replica per 2 vCPU, so 8 vCPU means 4 replicas |
+| RAM | 8 GB | **16 GB** | ~500 MB per app replica, 4 GB for PostgreSQL, plus nginx and the OS |
+| Disk | 100 GB SSD | **200 GB SSD** | See the breakdown below. **SSD, not spinning disk** — the database is latency-sensitive |
+| OS | Ubuntu 22.04 LTS | **Ubuntu 24.04 LTS** | Anything with Docker Engine works; these instructions are apt-based |
+| Network | 100 Mbps | **1 Gbps** | Uploads cluster at the end of the three hours |
 
-Set these on the host. Never commit them.
+Sized for **1000 participants over a three-hour window**, with the sharpest load in the
+first ten minutes when everybody signs in at once, and a second peak at the end when
+reports are uploaded.
 
-### Required
+### Where the disk goes
 
-| Variable | Value |
+| | |
 |---|---|
-| `DATABASE_URL` | Postgres connection string used by the app. The **pooled** endpoint if there is a pooler; otherwise the same as below |
-| `DIRECT_DATABASE_URL` | Connection string for the migration step. Must **not** go through a pooler. Identical to the above when there is none |
-| `SESSION_SECRET` | ≥32 chars. `pnpm gen:secrets` |
-| `CNIC_PEPPER` | ≥16 chars. `pnpm gen:secrets` |
-| `CNIC_ENCRYPTION_KEY` | Exactly 32 bytes, base64. `pnpm gen:secrets` |
-| `APP_URL` | The public HTTPS origin, e.g. `https://qa.womentechquest.pk` |
-| `NODE_ENV` | `production` |
+| Uploads — PDFs and screenshots | ~30 GB (1000 × one report plus several screenshots) |
+| PostgreSQL | < 5 GB — the database holds text, not files |
+| Docker images and layers | ~5 GB |
+| Local backups before they are copied off | ~10 GB |
+| OS and headroom | ~20 GB |
 
-### Storage — pick one set
+100 GB works. 200 GB means nobody watches a disk gauge on event day, and a full disk
+stops PostgreSQL writing — which is every save failing at once.
 
-**S3 or any S3-compatible store (MinIO, R2, Spaces):**
+### Access and networking
 
-| Variable | Value |
-|---|---|
-| `STORAGE_DRIVER` | `s3` |
-| `S3_BUCKET` | Bucket name |
-| `S3_REGION` | Bucket region |
-| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | Credentials scoped to that bucket only |
-| `S3_ENDPOINT` | Only for non-AWS S3-compatible stores |
+- **Inbound:** 443 (HTTPS) and 80 (redirect to HTTPS) from the internet or the venue
+  network. **Nothing else** — in particular not 5432, and not 3000.
+- **Outbound:** HTTPS, to pull packages and Docker images during setup.
+- **SSH** for whoever administers it.
+- **A DNS name** pointing at the VM, plus a TLS certificate for it. A public name lets
+  you use Let's Encrypt; an internal one needs a certificate from IT.
 
-**Azure Blob Storage:**
+### Also ask for
 
-| Variable | Value |
-|---|---|
-| `STORAGE_DRIVER` | `azure` |
-| `AZURE_STORAGE_CONNECTION_STRING` | Connection string |
-| `AZURE_STORAGE_CONTAINER` | Container name |
-
-The bucket or container must be **private**. Files are served through an authorised
-route that checks the caller's role; nothing is fetched by a public URL.
-
-### Optional
-
-| Variable | Default | Notes |
-|---|---|---|
-| `MAX_UPLOAD_MB` | `20` | Challenge 2 PDF cap. Raising it also needs `serverActions.bodySizeLimit` in `next.config.ts` raised to match |
-| `SEED_SUPER_ADMIN_EMAIL` / `_PASSWORD` | — | Only needed for the very first deploy, to create the bootstrap admin. Remove them afterwards |
-
-> The application validates all of this at startup and **refuses to boot** on anything
-> missing or malformed, naming the variable. That is deliberate: a bad value should
-> fail the deploy, not the event.
+- **A second, smaller VM** (2 vCPU / 4 GB) to rehearse on. Deploying to production for
+  the first time on event week is the avoidable risk here.
+- **Somewhere off this VM to put backups.** A backup on the same disk as the database
+  is not a backup.
+- **A named owner** who can restart services and read logs on 10 October.
 
 ---
 
-## 4. The two secrets you cannot lose
+## 2. What gets deployed
 
-`CNIC_PEPPER` and `CNIC_ENCRYPTION_KEY` are not rotatable once participants have
-registered.
+```
+                   ┌─────────── the VM ───────────────────────┐
+  Internet ──443──►│ nginx (TLS)                              │
+                   │   └─► app ×4  (containers)               │
+                   │         ├─► PostgreSQL 17  (on the host) │
+                   │         └─► uploads  (Docker volume)     │
+                   └──────────────────────────────────────────┘
+```
 
-- The **pepper** is mixed into a one-way hash of each ID card number. That hash is how
-  login-by-ID-card and duplicate detection work. Change it and every existing
-  participant's ID card stops matching — they cannot log in that way, and the system
-  no longer recognises them as already registered.
-- The **encryption key** decrypts the stored ID card for the admin console. Lose it
-  and those values are unreadable for good.
+Three deliberate choices:
 
-Store both in a password manager or a key vault, held by at least two people, before
-registration opens. `SESSION_SECRET` is different — rotating it only signs everyone
-out, which is recoverable.
+**PostgreSQL runs on the host, not in a container.** A container is where people lose
+databases — a missing or misconfigured volume looks fine until the container is
+replaced. The one thing on this VM that cannot be recreated is the data.
+
+**Uploads go to a Docker volume, not to object storage.** Every replica is on this one
+machine and mounts the same volume, so local disk is correct and has no extra moving
+parts. This is what `STORAGE_LOCAL_SHARED_VOLUME=true` asserts, and the application
+refuses to start in production without it (§11).
+
+> MinIO was the earlier recommendation for self-hosted object storage. **Its
+> open-source server was archived in 2025 and no longer receives security updates**, so
+> it is not something to introduce now. If the deployment ever outgrows one VM, use a
+> maintained S3-compatible store or a cloud one — `STORAGE_DRIVER` already supports
+> both, and it is an environment variable, not a code change.
+
+**Migrations run as their own step**, from their own image, before the app starts.
+Several replicas booting at once must not race each other applying one migration.
 
 ---
 
-## 5. Deploying
+## 3. Prepare the VM
 
-### Route A — Docker (recommended for on-prem or any container host)
-
-The included `Dockerfile` is multi-stage and produces a small runtime image that runs
-as a non-root user and carries a health check.
+Everything from here runs on the VM over SSH.
 
 ```bash
-docker build -t wtq-portal:latest .
+sudo apt update && sudo apt -y upgrade
+sudo apt -y install ca-certificates curl git ufw
 ```
 
-Migrations run from a **separate image**, built from the same Dockerfile. The runtime
-image has no Prisma CLI in it — `output: "standalone"` traces only what the server
-imports, and the CLI is not one of those things, so `migrate deploy` cannot be run
-from the app image. Build the migrator once:
+### Firewall
 
 ```bash
-docker build --target migrator -t wtq-migrator:latest .
+sudo ufw allow OpenSSH
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw --force enable
+sudo ufw status
 ```
 
-Then run it **before** starting or updating the app:
+PostgreSQL is deliberately absent from that list. It is reached over the Docker bridge,
+not over the network.
+
+### Docker Engine
 
 ```bash
-docker run --rm \
-  -e DIRECT_DATABASE_URL="postgresql://…" \
-  wtq-migrator:latest
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker "$USER"
+newgrp docker          # or log out and back in
+docker --version && docker compose version
 ```
 
-Then start the app:
+---
+
+## 4. PostgreSQL on the host
 
 ```bash
-docker run -d --name wtq-portal -p 3000:3000 \
-  --env-file ./production.env \
-  wtq-portal:latest
+sudo apt -y install postgresql-17
+sudo systemctl enable --now postgresql
 ```
 
-The image's `CMD` is `node server.js` — the standalone server. Do not override it with
-`next start`, which cannot run a standalone build.
-
-> **Not yet exercised.** There is no Docker on the development machine, so this route
-> is correct by construction but has never been built end to end. Build both images
-> and run them against a scratch database before relying on them — that belongs with
-> the Day 13 deployment rehearsal in [DELIVERY_PLAN.md](./DELIVERY_PLAN.md).
-
-### Route B — a Node host (VM, App Service, or similar)
+### Create the database and its role
 
 ```bash
-git clone <repo> && cd wtq-qa-challenge-submissions
+sudo -u postgres psql <<'SQL'
+CREATE ROLE wtq_app WITH LOGIN PASSWORD 'CHOOSE_A_STRONG_PASSWORD';
+CREATE DATABASE wtq2026 OWNER wtq_app;
+SQL
+```
+
+### Let containers reach it
+
+Containers arrive on the Docker bridge, so PostgreSQL has to listen on it and trust it.
+Find the bridge subnet:
+
+```bash
+docker network inspect bridge --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}'
+# typically 172.17.0.0/16
+```
+
+Then, as root, edit the two configuration files:
+
+```bash
+# /etc/postgresql/17/main/postgresql.conf
+listen_addresses = 'localhost,172.17.0.1'
+max_connections = 200
+shared_buffers = 4GB              # about 25% of RAM
+
+# /etc/postgresql/17/main/pg_hba.conf  — add this line
+host    wtq2026    wtq_app    172.17.0.0/16    scram-sha-256
+```
+
+`max_connections = 200` is generous on purpose. The application caps itself at 10
+connections per replica, so four replicas use 40; the headroom covers migrations,
+backups and a psql session without anyone doing arithmetic under pressure.
+
+```bash
+sudo systemctl restart postgresql
+```
+
+---
+
+## 5. Get the code and configure it
+
+```bash
+sudo mkdir -p /opt/wtq && sudo chown "$USER" /opt/wtq
+git clone https://github.com/hammadmahmood10p/wtq-qa-challenge-submissions.git /opt/wtq
+cd /opt/wtq
 git checkout main
-
-pnpm install --frozen-lockfile
-pnpm prisma generate
-pnpm build
 ```
 
-Deploy these to the server:
+### Generate the secrets
 
-```
-.next/standalone/     the server and its dependencies
-.next/static/     →   copy to .next/standalone/.next/static
-public/           →   copy to .next/standalone/public
-prisma/               needed only by the migration step
-```
-
-Start it with:
+On any machine with Node, or on the VM after installing it:
 
 ```bash
-NODE_ENV=production node .next/standalone/server.js
+node -e "const c=require('crypto');console.log('SESSION_SECRET='+c.randomBytes(48).toString('base64url'));console.log('CNIC_PEPPER='+c.randomBytes(32).toString('base64url'));console.log('CNIC_ENCRYPTION_KEY='+c.randomBytes(32).toString('base64'))"
 ```
 
-Put it behind nginx, IIS or the platform's own TLS terminator. The app expects to be
-reached over HTTPS: session cookies are `Secure` and `SameSite=Strict`.
+### Write the configuration
 
-### Route C — a managed platform (Vercel, Netlify and similar)
+```bash
+cp deploy/production.env.example production.env
+chmod 600 production.env
+nano production.env
+```
 
-Connect the repository, set the environment variables from §3, and let the platform
-build. Add `pnpm prisma migrate deploy` as a pre-deploy or release command. Nothing
-else is needed — `output: "standalone"` is compatible with, and ignored by, platforms
-that handle the server themselves.
+Fill in the database password, the three secrets, and `APP_URL` — the public https
+origin. Everything else has a working default.
+
+> **`CNIC_PEPPER` and `CNIC_ENCRYPTION_KEY` cannot be rotated** once participants have
+> registered. Changing the pepper orphans every ID-card login; losing the key makes
+> stored ID cards unreadable. Put both in a password manager, held by at least two
+> people, **before registration opens**.
+
+### TLS certificate
+
+Put the certificate and its key where nginx expects them:
+
+```bash
+mkdir -p deploy/certs
+# Public DNS name — Let's Encrypt:
+sudo apt -y install certbot
+sudo certbot certonly --standalone -d qa.example.com
+sudo cp /etc/letsencrypt/live/qa.example.com/fullchain.pem deploy/certs/
+sudo cp /etc/letsencrypt/live/qa.example.com/privkey.pem   deploy/certs/
+sudo chown "$USER" deploy/certs/*.pem
+
+# Certificate from IT — just copy both files in as fullchain.pem and privkey.pem.
+```
+
+Both files are git-ignored.
 
 ---
 
-## 6. Migrations
-
-**Always a separate step, never on container start.** Several instances booting at
-once must not race each other applying the same migration.
+## 6. Build, migrate, start
 
 ```bash
-pnpm prisma migrate deploy
+cd /opt/wtq
+
+# 1. Build both images.
+docker compose --env-file production.env build
+
+# 2. Apply the schema. Separate step, before anything starts.
+docker compose --env-file production.env run --rm migrator
+
+# 3. First deploy only — create the bootstrap super admin.
+SEED_SUPER_ADMIN_EMAIL=admin@10pearls.com \
+SEED_SUPER_ADMIN_PASSWORD='a-strong-one' \
+docker compose --env-file production.env run --rm \
+  -e SEED_SUPER_ADMIN_EMAIL -e SEED_SUPER_ADMIN_PASSWORD \
+  migrator pnpm tsx prisma/seed.ts
+
+# 4. Start, with four app replicas.
+docker compose --env-file production.env up -d --scale app=4
 ```
 
-This applies only migrations that have not run yet, and is safe to repeat. It uses
-`DIRECT_DATABASE_URL`, because a connection pooler cannot run DDL.
+A password change is forced at that admin's first login.
 
-Never run `prisma migrate dev` or `prisma db push` against production. The first tries
-to author a new migration and can prompt to reset the database; the second bypasses
-migration history entirely.
-
-### First deploy only
-
-After the first `migrate deploy`, seed the settings and the bootstrap admin:
+### Check it
 
 ```bash
-SEED_SUPER_ADMIN_EMAIL=… SEED_SUPER_ADMIN_PASSWORD=… pnpm tsx prisma/seed.ts
+docker compose ps                          # all healthy
+curl -fsS https://qa.example.com/api/health
 ```
 
-A password change is forced at that account's first login. Remove the two seed
-variables from the environment afterwards.
-
-Do **not** run `pnpm db:seed:demo` against production. It refuses when
-`NODE_ENV=production`, but do not rely on that as the only control — its passwords are
-written down in plain text.
+Expect `"status":"ok"` and `"database":"ok"`. Then open the site, sign in as the admin,
+change the password, and set the application URL and Challenge 4 CSV from **Overview →
+Event configuration**.
 
 ---
 
-## 7. Health checks and monitoring
+## 7. Deploying a new version
 
-`GET /api/health` returns 200 when healthy and **503** when the database is
-unreachable, so it works directly as a load-balancer probe.
+```bash
+cd /opt/wtq
+git pull
 
-```json
-{
-  "status": "ok",
-  "database": "ok",
-  "databaseLatencyMs": 41,
-  "storageDriver": "local",
-  "uptimeSeconds": 26,
-  "checkedInMs": 41,
-  "timestamp": "2026-09-24T08:19:18.003Z"
-}
+docker compose --env-file production.env build
+docker compose --env-file production.env run --rm migrator     # before the new code
+docker compose --env-file production.env up -d --scale app=4
 ```
 
-It deliberately touches the database — a process that is up but cannot reach Postgres
-is not healthy, and that is exactly the failure mode expected under load.
+Migrations go **before** the new containers, so the schema is ready when they start.
 
-Worth alerting on, for event day:
+### Rolling back
 
-- `status` other than `ok` for more than one probe interval.
-- `databaseLatencyMs` climbing above ~300 ms sustained — the signal that the
-  connection pool is saturating.
-- 5xx rate on `/challenge/*`, which is where participants are.
+The application and the database roll back differently, and the difference matters.
+
+- **Application** — `git checkout <previous-tag>`, rebuild, restart. Fast and safe.
+- **Database** — there are no down-migrations. The way back is a restore from backup,
+  which loses everything written since.
+
+So: keep migrations additive, deploy them ahead of the code that needs them, and never
+ship a destructive migration on event day.
 
 ---
 
 ## 8. Backups
 
-> On a **self-hosted** database none of this is automatic. Points 1 and 2 below
-> describe what a managed provider does for you; on your own server they are jobs with
-> an owner. See §6 of [DATABASE_MIGRATION.md](./DATABASE_MIGRATION.md).
+**Two things need backing up, and only one of them is the database.** The uploads
+volume holds every participant's report and screenshots; those files are not in
+PostgreSQL, which stores only their keys.
 
-Before the event:
+```bash
+sudo mkdir -p /var/backups/wtq && sudo chown "$USER" /var/backups/wtq
+```
 
-1. Turn on **point-in-time recovery** — at the provider, or via WAL archiving on a
-   self-hosted server — with a retention window covering the whole event weekend. At
-   minimum, a nightly `pg_dump` written somewhere that is not the database server.
-2. Take a manual snapshot immediately before registration opens, and another
-   immediately before the challenge starts.
-3. **Restore one of them into a scratch database and check it.** A backup nobody has
-   restored is a hope, not a backup. This is a scheduled Day 13 task and it is the
-   only way to find out that the backup is fine.
+Save this as `/opt/wtq/backup.sh` and `chmod +x` it:
 
-Object storage holds the uploaded PDFs and screenshots. Enable versioning or soft
-delete on the bucket — a deleted object is a participant's submission.
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+STAMP=$(date +%Y%m%d-%H%M)
+DEST=/var/backups/wtq
+
+sudo -u postgres pg_dump -Fc wtq2026 > "$DEST/db-$STAMP.dump"
+
+docker run --rm -v wtq_uploads:/data -v "$DEST":/backup alpine \
+  tar czf "/backup/uploads-$STAMP.tar.gz" -C /data .
+
+find "$DEST" -name '*.dump' -mtime +7 -delete
+find "$DEST" -name '*.tar.gz' -mtime +7 -delete
+```
+
+Hourly during the event, nightly otherwise:
+
+```bash
+crontab -e
+# 0 * * * * /opt/wtq/backup.sh >> /var/log/wtq-backup.log 2>&1
+```
+
+**Copy them off this VM.** A backup on the same disk as the thing it protects is not a
+backup.
+
+### Restore, and rehearse it
+
+```bash
+# Database, into a scratch copy first
+sudo -u postgres createdb wtq_restore_test
+sudo -u postgres pg_restore -d wtq_restore_test --no-owner /var/backups/wtq/db-XXXX.dump
+
+# Uploads
+docker run --rm -v wtq_uploads:/data -v /var/backups/wtq:/backup alpine \
+  tar xzf /backup/uploads-XXXX.tar.gz -C /data
+```
+
+**Do this once before the event, for real.** A backup nobody has restored is a hope.
 
 ---
 
-## 9. Rolling back
+## 9. Running it on the day
 
-The application and the database roll back differently, and the difference matters.
+```bash
+docker compose ps                        # health of every container
+docker compose logs -f --tail=100 app    # application logs
+docker compose restart app               # restart replicas, no config change
+docker compose --env-file production.env up -d --scale app=6   # more capacity
+```
 
-- **The application** is a redeploy of the previous image or commit. Safe and fast.
-- **The database** is not. Prisma migrations have no down-migrations here. If a
-  migration is wrong, the route back is a restore from point-in-time recovery, which
-  loses everything written since.
+Worth watching:
 
-So: deploy the migration ahead of the release that needs it, keep migrations additive
-where possible, and never ship a destructive migration on event day.
+- `/api/health` returning anything but 200.
+- `databaseLatencyMs` above ~300 ms sustained — the pool saturating.
+- `df -h` — a full disk stops PostgreSQL writing.
+- `docker stats` — memory per replica.
+
+The admin console has two controls for when something goes wrong: **Disable All**
+closes participant logins without disturbing anyone already working, and **Sign
+everyone out** is the emergency stop. Both are on Participants.
 
 ---
 
-## 10. Still open
+## 10. Environment variables
 
-These are decisions or values the organisers and IT owe the project. They are tracked
-in [PENDING.md](./PENDING.md); they are repeated here because they block a production
-deployment specifically.
+The image is identical in every environment. Only `production.env` differs.
 
-| # | What is needed | Why it blocks |
-|---|---|---|
-| **P3** | The deployment target | Everything in §5 depends on it |
-| **P4** | Database region, once P3 is known | Recreating it later means migrating live data. *Largely answered: the decision is a self-hosted PostgreSQL alongside the application, which closes R1b* |
-| **P1** | The public URL of the application under test | Participants cannot start Challenge 1 without it |
-| **P2** | The Challenge 4 CSV | Same, for Challenge 4 |
+| Variable | Notes |
+|---|---|
+| `DATABASE_URL` | `postgresql://wtq_app:…@host.docker.internal:5432/wtq2026` |
+| `DIRECT_DATABASE_URL` | Same value — there is no pooler to bypass |
+| `SESSION_SECRET` | ≥32 chars. Rotating it signs everyone out |
+| `CNIC_PEPPER` | ≥16 chars. **Not rotatable** once accounts exist |
+| `CNIC_ENCRYPTION_KEY` | 32 bytes base64. **Not recoverable** if lost |
+| `APP_URL` | Public https origin. Wrong value breaks download links |
+| `MAX_UPLOAD_MB` | Default 20. Raising it also needs `client_max_body_size` in `deploy/nginx.conf` and `serverActions.bodySizeLimit` in `next.config.ts` |
+| `IMAGE_TAG` | Pin to a built tag so rollback is a one-word change |
 
-Remaining engineering work before this is production-ready is listed in
-[DELIVERY_PLAN.md](./DELIVERY_PLAN.md) — a load test at 1200 users, a security pass,
-and a dress rehearsal, none of which have been done yet.
+Storage is set in `docker-compose.yml` rather than here, because it describes the
+topology rather than the environment.
+
+The application validates all of this at startup and **refuses to boot** on anything
+missing or malformed, naming the variable. A bad value should fail the deploy, not the
+event.
+
+---
+
+## 11. What is proven, and what is not
+
+Being exact about this, because the difference matters when something fails at 9am.
+
+**Verified**, by running the production build on the development machine with the same
+storage configuration the containers use:
+
+- The standalone server starts under `NODE_ENV=production` and serves pages.
+- `/api/health` reports the database reachable.
+- An upload written to local shared storage in production mode round-trips: bytes land
+  on disk, download returns exactly what was uploaded, and a forged signature is
+  refused with 403.
+- A production deployment with `STORAGE_DRIVER=local` and **no**
+  `STORAGE_LOCAL_SHARED_VOLUME=true` **fails at startup** with an explanation, rather
+  than starting and failing at the first upload.
+
+**Not verified** — no Docker on the development machine:
+
+- Neither image has ever been built. Expect the first `docker compose build` to need a
+  fix or two.
+- `prisma migrate deploy` has not been run from the migrator image. The dependency
+  layer is installed with `--ignore-scripts`, so if the Prisma engines are missing,
+  that step is where it shows.
+- nginx has never proxied to the app; the TLS and upload-size settings are unexercised.
+- Reaching host PostgreSQL over `host.docker.internal` is unexercised on Linux.
+
+**So the first deployment is the rehearsal.** Do it on the spare VM, with time in hand.
+
+---
+
+## 12. Still open
+
+| # | What is needed |
+|---|---|
+| **P3** | The VM itself — §1 is the specification to request |
+| — | A load test at 1000+ users against this topology (Day 12); the numbers do not transfer from any other setup |
+| — | A security pass |
+| — | A dress rehearsal with real testers |
 
 ---
 
 ## Quick reference
 
 ```bash
-# Build
-pnpm install --frozen-lockfile
-pnpm prisma generate
-pnpm build
-
-# Migrate (separate step, before release)
-pnpm prisma migrate deploy
-
-# Run
-NODE_ENV=production node .next/standalone/server.js
-
-# Verify
-curl -f https://<host>/api/health
+cd /opt/wtq
+docker compose --env-file production.env build
+docker compose --env-file production.env run --rm migrator
+docker compose --env-file production.env up -d --scale app=4
+curl -fsS https://qa.example.com/api/health
 ```
