@@ -8,13 +8,18 @@ import { encryptCnic, hashCnic } from "@/lib/crypto";
 import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
 import { signupConflictField } from "@/lib/prisma-errors";
+import { LAST_ADMIN_MESSAGE, wouldStrandTheEvent } from "@/lib/last-admin";
 import { revokeAllSessions } from "@/lib/session";
 import {
   PARTICIPANT_LOGINS_DISABLED,
   setParticipantLoginsDisabled,
 } from "@/lib/settings";
 import { formatTempPassword, generateTempPassword } from "@/lib/temp-password";
-import { adminCreateJudgeSchema, adminCreateParticipantSchema } from "@/lib/validation/admin";
+import {
+  adminCreateJudgeSchema,
+  adminCreateParticipantSchema,
+  adminCreateSuperAdminSchema,
+} from "@/lib/validation/admin";
 
 export interface AdminState {
   ok?: boolean;
@@ -185,12 +190,41 @@ export async function adminCreateJudge(
  * Their work is deliberately left intact and visible to judges — blocking a person is
  * not the same as discarding what they did.
  */
+/**
+ * Refuses an action that would leave nobody able to administer the event.
+ *
+ * Returns a message when the action must not proceed, null when it may.
+ */
+async function strandingRefusal(userId: string): Promise<string | null> {
+  const target = await db.user.findUnique({
+    where: { id: userId },
+    select: { role: true, status: true },
+  });
+
+  if (!target) return null;
+
+  const otherActiveSuperAdmins = await db.user.count({
+    where: { role: "SUPER_ADMIN", status: "ACTIVE", deletedAt: null, id: { not: userId } },
+  });
+
+  return wouldStrandTheEvent({
+    targetRole: target.role,
+    targetStatus: target.status,
+    otherActiveSuperAdmins,
+  })
+    ? LAST_ADMIN_MESSAGE
+    : null;
+}
+
 export async function adminBlockUser(userId: string): Promise<AdminState> {
   const admin = await requireRole("SUPER_ADMIN");
 
   if (userId === admin.id) {
     return { message: "You cannot block your own account." };
   }
+
+  const stranded = await strandingRefusal(userId);
+  if (stranded) return { message: stranded };
 
   await db.user.update({ where: { id: userId }, data: { status: "BLOCKED" } });
   await revokeAllSessions(userId);
@@ -243,6 +277,9 @@ export async function adminRemoveUser(userId: string): Promise<AdminState> {
   if (userId === admin.id) {
     return { message: "You cannot remove your own account." };
   }
+
+  const stranded = await strandingRefusal(userId);
+  if (stranded) return { message: stranded };
 
   await db.user.update({
     where: { id: userId },
@@ -456,4 +493,67 @@ export async function adminSignOutAllParticipants(): Promise<AdminState> {
 
   refresh();
   return { ok: true, message: `Signed out ${count} participant session(s).` };
+}
+
+// ---------------------------------------------------------------------------
+// Super admins
+// ---------------------------------------------------------------------------
+
+/**
+ * Creates another super admin.
+ *
+ * The highest-privilege action in the product, so it behaves like the others rather
+ * than specially: a temporary password shown once, a forced change at first login, and
+ * an audit entry naming who created whom. The password is never stored anywhere
+ * readable and never emailed — there is no mail service — so the creating admin has to
+ * hand it over before closing the dialog.
+ */
+export async function adminCreateSuperAdmin(
+  _prev: AdminState,
+  formData: FormData,
+): Promise<AdminState> {
+  const admin = await requireRole("SUPER_ADMIN");
+
+  const parsed = adminCreateSuperAdminSchema.safeParse({
+    email: formData.get("email"),
+    fullName: formData.get("fullName"),
+  });
+
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+
+  const data = parsed.data;
+  const tempPassword = generateTempPassword();
+
+  try {
+    const user = await db.user.create({
+      data: {
+        role: "SUPER_ADMIN",
+        email: data.email,
+        fullName: data.fullName,
+        passwordHash: await hashPassword(tempPassword),
+        status: "ACTIVE",
+        mustChangePassword: true,
+        createdById: admin.id,
+      },
+    });
+
+    await audit({
+      action: "admin.super_admin_created",
+      actorId: admin.id,
+      actorRole: "SUPER_ADMIN",
+      entityType: "user",
+      entityId: user.id,
+      metadata: { email: data.email, fullName: data.fullName },
+    });
+  } catch (error) {
+    const conflict = conflictErrors(error);
+    if (conflict) return { errors: conflict };
+
+    console.error("[admin:createSuperAdmin]", error);
+    return { message: "Could not create the super admin. Please try again." };
+  }
+
+  refresh();
+  revalidatePath("/admin/admins");
+  return { ok: true, tempPassword: formatTempPassword(tempPassword) };
 }

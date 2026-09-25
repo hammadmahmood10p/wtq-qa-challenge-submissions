@@ -26,6 +26,7 @@ export type AuditAction =
   | "admin.participant_unblocked"
   | "admin.participant_removed"
   | "admin.password_reset"
+  | "admin.super_admin_created"
   | "admin.judge_approved"
   | "admin.judge_rejected"
   | "admin.attempt_reopened"

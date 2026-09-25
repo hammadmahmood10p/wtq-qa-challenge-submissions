@@ -83,7 +83,7 @@ export function RowActions({
   userId: string;
   fullName: string;
   status: string;
-  kind: "participant" | "judge";
+  kind: "participant" | "judge" | "admin";
   attempt?: RosterRow["attempt"];
 }) {
   const [pending, startTransition] = useTransition();

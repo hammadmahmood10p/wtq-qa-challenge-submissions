@@ -18,6 +18,22 @@ export const adminCreateParticipantSchema = z.object({
   location: locationSchema,
 });
 
+/**
+ * A second super admin.
+ *
+ * Same domain rule as judges. A super admin can block every account, read every ID
+ * card and reopen any result, so "who may hold this" should not be a free-text field —
+ * requiring a 10Pearls address makes handing it to an outside address a deliberate
+ * code change rather than a typo.
+ */
+export const adminCreateSuperAdminSchema = z.object({
+  email: emailSchema.refine(
+    isJudgeEmail,
+    `A super admin must have a ${JUDGE_EMAIL_DOMAIN} email address`,
+  ),
+  fullName: fullNameSchema,
+});
+
 export const adminCreateJudgeSchema = z.object({
   email: emailSchema.refine(
     isJudgeEmail,

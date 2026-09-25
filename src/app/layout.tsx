@@ -1,32 +1,20 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono, Sora } from "next/font/google";
 import "./globals.css";
 
 /**
- * Fonts are downloaded at build time and served from our own origin, so the running
- * app never calls Google. That matters if IT deploys somewhere with restricted egress
- * (R0) — a blocked font request must not be able to affect the event.
+ * Fonts are vendored into public/fonts and declared in globals.css, not fetched
+ * through next/font/google.
+ *
+ * The intent has not changed — the running app never calls Google, which matters on a
+ * deployment with restricted egress. What changed is that `next/font/google` fetches
+ * at *build* time, and the container build cannot reach fonts.googleapis.com through
+ * the corporate proxy. A build that needs the internet for fonts is a build that fails
+ * on the machine it matters on.
+ *
+ * Preloaded here rather than left to discovery: these two carry the headings and body
+ * text of every page, and without the hint the browser only learns it needs them after
+ * parsing the stylesheet.
  */
-const sora = Sora({
-  variable: "--font-sora",
-  subsets: ["latin"],
-  weight: ["600", "700"],
-  display: "swap",
-});
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  display: "swap",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
-  subsets: ["latin"],
-  weight: ["400"],
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "Women Tech Quest 2026 — QA Challenge Portal",
@@ -36,9 +24,23 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${sora.variable} ${inter.variable} ${jetbrainsMono.variable} antialiased`}>
-        {children}
-      </body>
+      <head>
+        <link
+          rel="preload"
+          href="/fonts/inter-latin.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          href="/fonts/sora-latin.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+      </head>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }

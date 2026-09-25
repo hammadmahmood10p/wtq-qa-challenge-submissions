@@ -6,12 +6,11 @@ specification to ask IT for.
 Written for whoever runs the deployment. It assumes Linux familiarity but no knowledge
 of this codebase. For running it on your own machine, read [SETUP.md](./SETUP.md).
 
-> **Status: not yet rehearsed.** Every command below is written from the actual
-> configuration in this repository, and the application has been run in production mode
-> with this exact storage setup (see §11). But the Docker images have never been built
-> — there is no Docker on the development machine — so treat the first run as the
-> rehearsal it is, and do it well before 10 October. §11 lists precisely what is and is
-> not proven.
+> **Status: images built and the stack run end to end** on 25 September, against a
+> throwaway PostgreSQL. Migrations, seeding, sign-in, uploads to the volume and
+> downloads back out all verified — see §11 for exactly what was and was not covered.
+> The parts still unproven are the ones that need the VM itself: nginx with real TLS,
+> and reaching PostgreSQL on the host.
 
 ---
 
@@ -398,31 +397,40 @@ event.
 
 Being exact about this, because the difference matters when something fails at 9am.
 
-**Verified**, by running the production build on the development machine with the same
-storage configuration the containers use:
+**Verified on 25 September**, by building both images and running the stack against a
+throwaway PostgreSQL container:
 
-- The standalone server starts under `NODE_ENV=production` and serves pages.
-- `/api/health` reports the database reachable.
-- An upload written to local shared storage in production mode round-trips: bytes land
-  on disk, download returns exactly what was uploaded, and a forged signature is
-  refused with 403.
-- A production deployment with `STORAGE_DRIVER=local` and **no**
-  `STORAGE_LOCAL_SHARED_VOLUME=true` **fails at startup** with an explanation, rather
-  than starting and failing at the first upload.
+- Both images build from a clean checkout. The runtime image is **320 MB**.
+- `prisma migrate deploy` applies all five migrations from the migrator image.
+- The bootstrap super admin seeds from that same image.
+- The app starts, reports healthy, and the Docker health check passes.
+- Sign-in works, including the forced password change on first login.
+- **An upload writes to the mounted volume and downloads back out of it.**
+- The app runs as a non-root user (`uid=1001 nextjs`, group `nodejs`).
+- Fonts are served from the image — no call to Google at build or at run time.
+- `docker compose config` parses.
 
-**Not verified** — no Docker on the development machine:
+Three real defects were found by doing this, each of which would have failed a
+production deployment:
 
-- Neither image has ever been built. Expect the first `docker compose build` to need a
-  fix or two.
-- `prisma migrate deploy` has not been run from the migrator image. The dependency
-  layer is installed with `--ignore-scripts`, so if the Prisma engines are missing,
-  that step is where it shows.
-- nginx has never proxied to the app; the TLS and upload-size settings are unexercised.
-- Reaching host PostgreSQL over `host.docker.internal` is unexercised on Linux.
+| What broke | Why |
+|---|---|
+| Build failed at `prisma generate` | `prisma.config.ts` resolves `DIRECT_DATABASE_URL` at module load; nothing set it at build time |
+| Build failed fetching fonts | `next/font/google` fetches from Google **at build time**, and the corporate proxy blocks it inside containers. Fonts are now vendored into the repository |
+| **Every upload failed with `EACCES`** | A named volume initialises root-owned, and the app runs as uid 1001. The image now creates `/data/uploads` owned by `nextjs`, which is the ownership Docker copies onto a fresh volume |
 
-**So the first deployment is the rehearsal.** Do it on the spare VM, with time in hand.
+**Not yet verified** — these need the VM:
 
----
+- **nginx in front of the app.** The container has never proxied to it; TLS, the 25 MB
+  upload limit and the streaming settings are unexercised.
+- **PostgreSQL on the host** over `host.docker.internal:host-gateway`. The test used a
+  PostgreSQL *container*, because the development machine's Postgres runs on Windows
+  and is not reachable from a WSL container without firewall work. On the VM this is
+  Linux-to-Linux, which is the case that mapping exists for — but it is untested.
+- **A bind mount instead of a named volume.** If you mount a host directory rather than
+  the named volume, ownership comes from the host and the image's ownership is *not*
+  copied. The host directory must be `chown 1001:1001`.
+- Load at anything like 1000 users.
 
 ## 12. Still open
 

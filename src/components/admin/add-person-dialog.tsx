@@ -2,7 +2,12 @@
 
 import { UserPlus } from "lucide-react";
 import { useActionState, useState } from "react";
-import { adminCreateJudge, adminCreateParticipant, type AdminState } from "@/app/actions/admin";
+import {
+  adminCreateJudge,
+  adminCreateParticipant,
+  adminCreateSuperAdmin,
+  type AdminState,
+} from "@/app/actions/admin";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -19,8 +24,20 @@ const LOCATIONS = [
   { value: "ISLAMABAD", label: "Islamabad" },
 ];
 
-export function AddPersonDialog({ kind }: { kind: "participant" | "judge" }) {
-  const action = kind === "participant" ? adminCreateParticipant : adminCreateJudge;
+const ACTIONS = {
+  participant: adminCreateParticipant,
+  judge: adminCreateJudge,
+  admin: adminCreateSuperAdmin,
+} as const;
+
+const LABELS = {
+  participant: "participant",
+  judge: "judge",
+  admin: "super admin",
+} as const;
+
+export function AddPersonDialog({ kind }: { kind: keyof typeof ACTIONS }) {
+  const action = ACTIONS[kind];
   const [state, formAction, pending] = useActionState(action, INITIAL);
 
   const [open, setOpen] = useState(false);
@@ -34,7 +51,7 @@ export function AddPersonDialog({ kind }: { kind: "participant" | "judge" }) {
   const formOpen = open && tempPassword === null;
 
   const error = (field: string) => state.errors?.[field];
-  const label = kind === "participant" ? "participant" : "judge";
+  const label = LABELS[kind];
 
   return (
     <>
@@ -53,7 +70,11 @@ export function AddPersonDialog({ kind }: { kind: "participant" | "judge" }) {
         open={formOpen}
         onClose={() => setOpen(false)}
         title={`Add a ${label}`}
-        description="They will get a temporary password, shown once, and choose their own at first login."
+        description={
+          kind === "admin"
+            ? "They will be able to administer the whole event. A temporary password is shown once, and they choose their own at first login."
+            : "They will get a temporary password, shown once, and choose their own at first login."
+        }
       >
         <form
           action={(formData) => {
@@ -105,14 +126,16 @@ export function AddPersonDialog({ kind }: { kind: "participant" | "judge" }) {
             label="Email"
             required
             error={error("email")}
-            hint={kind === "judge" ? `Must end in ${JUDGE_EMAIL_DOMAIN}` : undefined}
+            hint={kind === "participant" ? undefined : `Must end in ${JUDGE_EMAIL_DOMAIN}`}
           >
             {({ id, describedBy, invalid, required }) => (
               <Input
                 id={id}
                 name="email"
                 type="email"
-                placeholder={kind === "judge" ? `them${JUDGE_EMAIL_DOMAIN}` : "them@example.com"}
+                placeholder={
+                  kind === "participant" ? "them@example.com" : `them${JUDGE_EMAIL_DOMAIN}`
+                }
                 required={required}
                 aria-describedby={describedBy}
                 invalid={invalid}

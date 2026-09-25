@@ -59,6 +59,16 @@ export function TempPasswordDialog({
           </Button>
         </div>
 
+        {/* Copy already strips them, but somebody reading this aloud in a noisy hall
+            has only what is on the screen. Without this line they dictate the dashes,
+            the other person types them, and the login fails for a reason neither of
+            them can see. */}
+        <p className="text-muted text-xs">
+          The dashes are only there to make it easier to read aloud — they are{" "}
+          <strong className="text-text">not part of the password</strong>. Typed out, it
+          is <code className="font-mono">{password?.replace(/-/g, "")}</code>.
+        </p>
+
         <Button variant="primary" full onClick={onClose}>
           I have passed this on
         </Button>

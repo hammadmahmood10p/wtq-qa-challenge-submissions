@@ -215,3 +215,38 @@ export async function rosterCounts() {
 
   return { participants, participantsBlocked, judgesPending, judgesActive };
 }
+
+/**
+ * The people who can administer the event.
+ *
+ * A small list by design — it exists so an admin can see who else holds this before
+ * adding another, and so an account nobody recognises is visible rather than buried
+ * in the audit log.
+ */
+export async function listSuperAdmins() {
+  const users = await db.user.findMany({
+    where: { role: "SUPER_ADMIN", status: { not: "REMOVED" } },
+    orderBy: [{ status: "asc" }, { createdAt: "asc" }],
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      status: true,
+      createdAt: true,
+      lastLoginAt: true,
+      createdBy: { select: { fullName: true } },
+    },
+  });
+
+  return users.map((u) => ({
+    id: u.id,
+    fullName: u.fullName,
+    email: u.email,
+    status: u.status,
+    createdAt: u.createdAt,
+    lastLoginAt: u.lastLoginAt,
+    createdByName: u.createdBy?.fullName ?? null,
+  }));
+}
+
+export type SuperAdminRow = Awaited<ReturnType<typeof listSuperAdmins>>[number];

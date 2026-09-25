@@ -1,12 +1,13 @@
-# Ships even though development does not use Docker.
+# The production image, and the migration image beside it.
 #
-# R0 in docs/DELIVERY_PLAN.md: the 10Pearls IT team has not yet chosen a deployment
-# target. If the answer turns out to be on-prem, a container host, or anything other
-# than a managed Node platform, this file makes that a non-event rather than a
-# scramble in the week before the event.
+# Four stages: deps installs once and is shared, migrator carries the Prisma CLI,
+# builder compiles, runner ships. See docs/DEPLOYMENT.md for how they are used.
 
 FROM node:22-alpine AS base
-RUN corepack enable
+# Activating the pinned version here means no stage stops to download it mid-build,
+# and the build stops depending on the npm registry being reachable at that moment.
+# Mirrors "packageManager" in package.json.
+RUN corepack enable && corepack prepare pnpm@12.4.2 --activate
 WORKDIR /app
 
 # --- dependencies ----------------------------------------------------------
@@ -42,7 +43,12 @@ COPY prisma.config.ts ./
 #
 #   docker compose run --rm migrator                          # migrate
 #   docker compose run --rm migrator pnpm tsx prisma/seed.ts  # seed, first deploy only
-RUN pnpm prisma generate
+#
+# The placeholder is scoped to this one command rather than set as ENV: `generate`
+# only reads the schema and never connects, but prisma.config.ts resolves the variable
+# at module load and fails without it. Leaving it in the image would mean a forgotten
+# runtime value silently pointing at localhost instead of failing loudly.
+RUN DIRECT_DATABASE_URL="postgresql://build:build@localhost:5432/build" pnpm prisma generate
 
 CMD ["pnpm", "prisma", "migrate", "deploy"]
 
@@ -51,26 +57,39 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build-time placeholders. The real values are injected at runtime; these exist only
-# so that src/lib/env.ts validation passes while Next.js prerenders.
-ENV DATABASE_URL="postgresql://build:build@localhost:5432/build"
-ENV SESSION_SECRET="build-time-placeholder-value-not-used-at-runtime"
-ENV CNIC_PEPPER="build-time-placeholder-pepper"
-ENV CNIC_ENCRYPTION_KEY="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN pnpm prisma generate && pnpm build
+# src/lib/env.ts validates at import, so the build needs syntactically valid values
+# even though it never connects to anything. They are exported inside this one RUN
+# rather than declared as ARG or ENV, so nothing resembling a secret ends up readable
+# in `docker inspect` — a fake one there is worse than useless, because it trains
+# whoever reads it to ignore exactly the thing they should notice.
+RUN export DATABASE_URL="postgresql://build:build@localhost:5432/build"  && export DIRECT_DATABASE_URL="postgresql://build:build@localhost:5432/build"  && export SESSION_SECRET="build-time-placeholder-value-not-used-at-runtime"  && export CNIC_PEPPER="build-time-placeholder-pepper"  && export CNIC_ENCRYPTION_KEY="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="  && pnpm prisma generate  && pnpm build
 
 # --- runtime ---------------------------------------------------------------
 FROM base AS runner
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+# -G puts nextjs *in* the nodejs group. Without it busybox gives the user `nogroup`
+# as its primary group, so every `--chown=nextjs:nodejs` below would be writing an
+# ownership the running process does not actually hold.
+RUN addgroup -g 1001 -S nodejs && adduser -u 1001 -S -G nodejs nextjs
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# The uploads directory has to exist in the image, owned by the user that will write
+# to it. When Docker initialises an empty named volume over a path that exists in the
+# image, it copies that path's contents *and its ownership* — so this is what makes
+# the volume writable. Without it the directory is created root-owned at mount time,
+# the app runs as nextjs, and every upload fails with EACCES: found exactly that way,
+# by running the container.
+#
+# A bind mount is different: ownership comes from the host, so the host directory has
+# to be chowned to 1001:1001. See docs/DEPLOYMENT.md.
+RUN mkdir -p /data/uploads && chown -R nextjs:nodejs /data/uploads
 
 # Migrations run from the `migrator` target above, as a separate deploy step —
 # several instances starting at once must not race each other applying the same
