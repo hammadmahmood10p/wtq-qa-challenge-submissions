@@ -309,6 +309,7 @@ export async function adminResetPassword(userId: string): Promise<AdminState> {
     data: {
       passwordHash: await hashPassword(tempPassword),
       mustChangePassword: true,
+      passwordIsDerived: false,
     },
   });
 

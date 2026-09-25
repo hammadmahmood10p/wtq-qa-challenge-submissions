@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { AddPersonDialog } from "@/components/admin/add-person-dialog";
+import { BulkImportDialog } from "@/components/admin/bulk-import-dialog";
+import { PasswordCell, PasswordReveal } from "@/components/admin/password-column";
 import { Pagination } from "@/components/admin/pagination";
 import { ParticipantAccessControls } from "@/components/admin/participant-access";
 import { RosterFilters } from "@/components/admin/roster-filters";
@@ -58,7 +60,10 @@ export default async function ParticipantsPage({
             Add, block or remove participants, and reopen or clear a submitted attempt.
           </p>
         </div>
-        <AddPersonDialog kind="participant" />
+        <div className="flex flex-wrap items-center gap-2">
+          <BulkImportDialog kind="participant" />
+          <AddPersonDialog kind="participant" />
+        </div>
       </div>
 
       <ParticipantAccessControls disabled={loginsDisabled} />
@@ -69,6 +74,7 @@ export default async function ParticipantsPage({
         searchHint="Name and email match partially. ID card and phone numbers are stored encrypted, so they only match in full."
       />
 
+      <PasswordReveal count={rows.filter((r) => r.derivedPassword).length}>
       <TableShell>
         <Thead>
           <Tr>
@@ -77,12 +83,13 @@ export default async function ParticipantsPage({
             <Th>Contact</Th>
             <Th>Location</Th>
             <Th>Status</Th>
+            <Th>Password</Th>
             <Th className="text-right">Actions</Th>
           </Tr>
         </Thead>
         <tbody>
           {rows.length === 0 ? (
-            <EmptyRow colSpan={6}>
+            <EmptyRow colSpan={7}>
               No participants match these filters.
             </EmptyRow>
           ) : (
@@ -108,6 +115,9 @@ export default async function ParticipantsPage({
                   )}
                 </Td>
                 <Td>
+                  <PasswordCell value={row.derivedPassword ?? null} />
+                </Td>
+                <Td>
                   <RowActions
                     userId={row.id}
                     fullName={row.fullName}
@@ -121,6 +131,7 @@ export default async function ParticipantsPage({
           )}
         </tbody>
       </TableShell>
+      </PasswordReveal>
 
       <Pagination page={query.page} pageCount={pageCount} total={total} noun="participants" />
     </div>

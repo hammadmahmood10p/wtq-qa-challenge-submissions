@@ -1,6 +1,7 @@
 import type { Prisma } from "@/generated/prisma/client";
 import type { AttemptState } from "@/generated/prisma/enums";
 import { remainingMinutesAtSubmit } from "@/lib/attempt-admin-limits";
+import { derivePassword } from "@/lib/bulk-import";
 import { decryptCnic, hashCnic } from "@/lib/crypto";
 import { db } from "@/lib/db";
 import { detectIdentifier, formatCnic, formatPhone } from "@/lib/normalize";
@@ -29,6 +30,16 @@ export interface RosterRow {
   phone?: string;
   location?: string;
   approvedAt?: Date | null;
+
+  /**
+   * The password, where it can still be known.
+   *
+   * Recomputed from the person's own details rather than stored: a bulk import built
+   * it from their name and number, and `passwordIsDerived` says whether that is still
+   * what the stored hash represents. Null the moment anyone changes it — and for
+   * anyone who chose their own — because from then on the derivation is a guess.
+   */
+  derivedPassword?: string | null;
 
   /**
    * The participant's run, where there is one. The roster is where a super admin
@@ -103,6 +114,7 @@ export async function listParticipants(query: RosterQuery) {
         status: true,
         createdAt: true,
         lastLoginAt: true,
+        passwordIsDerived: true,
         participantProfile: {
           select: {
             idCardEncrypted: true,
@@ -138,6 +150,10 @@ export async function listParticipants(query: RosterQuery) {
       : undefined,
     phone: u.participantProfile ? formatPhone(u.participantProfile.phoneE164) : undefined,
     location: u.participantProfile?.location,
+    derivedPassword:
+      u.passwordIsDerived && u.participantProfile
+        ? derivePassword(u.fullName, decryptCnic(u.participantProfile.idCardEncrypted))
+        : null,
     attempt: u.participantProfile?.attempt
       ? {
           state: u.participantProfile.attempt.state,
@@ -187,7 +203,8 @@ export async function listJudges(query: RosterQuery) {
         status: true,
         createdAt: true,
         lastLoginAt: true,
-        judgeProfile: { select: { approvedAt: true } },
+        passwordIsDerived: true,
+        judgeProfile: { select: { approvedAt: true, phoneE164: true } },
       },
     }),
   ]);
@@ -200,6 +217,11 @@ export async function listJudges(query: RosterQuery) {
     createdAt: u.createdAt,
     lastLoginAt: u.lastLoginAt,
     approvedAt: u.judgeProfile?.approvedAt ?? null,
+    phone: u.judgeProfile?.phoneE164 ? formatPhone(u.judgeProfile.phoneE164) : undefined,
+    derivedPassword:
+      u.passwordIsDerived && u.judgeProfile?.phoneE164
+        ? derivePassword(u.fullName, u.judgeProfile.phoneE164)
+        : null,
   }));
 
   return { rows, total, pageCount: Math.max(1, Math.ceil(total / PAGE_SIZE)) };

@@ -178,6 +178,9 @@ export async function changePassword(_prev: AuthState, formData: FormData): Prom
     data: {
       passwordHash: await hashPassword(parsed.data.newPassword),
       mustChangePassword: false,
+      // From here the stored hash and the import's derivation disagree, so the admin
+      // console must stop offering the old value as if it still worked.
+      passwordIsDerived: false,
     },
   });
 

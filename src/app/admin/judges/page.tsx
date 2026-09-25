@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { AddPersonDialog } from "@/components/admin/add-person-dialog";
+import { BulkImportDialog } from "@/components/admin/bulk-import-dialog";
+import { PasswordCell, PasswordReveal } from "@/components/admin/password-column";
 import { Pagination } from "@/components/admin/pagination";
 import { RosterFilters } from "@/components/admin/roster-filters";
 import { RowActions } from "@/components/admin/row-actions";
@@ -50,7 +52,10 @@ export default async function JudgesPage({
             Approve accounts, add judges, and block or remove them.
           </p>
         </div>
-        <AddPersonDialog kind="judge" />
+        <div className="flex flex-wrap items-center gap-2">
+          <BulkImportDialog kind="judge" />
+          <AddPersonDialog kind="judge" />
+        </div>
       </div>
 
       {/* Requirement 7: judges cannot log in until approved, so an unattended queue
@@ -63,6 +68,7 @@ export default async function JudgesPage({
 
       <RosterFilters statuses={STATUSES} searchHint="Search matches name and email." />
 
+      <PasswordReveal count={rows.filter((r) => r.derivedPassword).length}>
       <TableShell>
         <Thead>
           <Tr>
@@ -70,12 +76,13 @@ export default async function JudgesPage({
             <Th>Email</Th>
             <Th>Status</Th>
             <Th>Approved</Th>
+            <Th>Password</Th>
             <Th className="text-right">Actions</Th>
           </Tr>
         </Thead>
         <tbody>
           {rows.length === 0 ? (
-            <EmptyRow colSpan={5}>No judges match these filters.</EmptyRow>
+            <EmptyRow colSpan={6}>No judges match these filters.</EmptyRow>
           ) : (
             rows.map((row) => (
               <Tr key={row.id}>
@@ -86,6 +93,9 @@ export default async function JudgesPage({
                 </Td>
                 <Td className="text-muted text-xs whitespace-nowrap">
                   {row.approvedAt ? dateFormat.format(row.approvedAt) : "—"}
+                </Td>
+                <Td>
+                  <PasswordCell value={row.derivedPassword ?? null} />
                 </Td>
                 <Td>
                   <RowActions
@@ -100,6 +110,7 @@ export default async function JudgesPage({
           )}
         </tbody>
       </TableShell>
+      </PasswordReveal>
 
       <Pagination page={query.page} pageCount={pageCount} total={total} noun="judges" />
     </div>

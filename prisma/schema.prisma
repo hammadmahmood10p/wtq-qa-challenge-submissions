@@ -87,6 +87,16 @@ model User {
   // Set after an admin-issued temporary password; forces a change at next login.
   mustChangePassword Boolean @default(false)
 
+  /// True while the password is still the one a bulk import derived from this
+  /// person's own details, so the admin console can show it back to them.
+  ///
+  /// It is a flag rather than a stored password: the value is recomputed from
+  /// fullName and the CNIC or phone already on the record, so nothing recoverable is
+  /// written down. The moment anyone changes the password — the person themselves, or
+  /// an admin issuing a temporary one — this goes false and the column shows a dash,
+  /// because from then on the stored hash and the derivation no longer agree.
+  passwordIsDerived Boolean @default(false)
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   lastLoginAt DateTime?
@@ -135,6 +145,13 @@ model ParticipantProfile {
 model JudgeProfile {
   userId String @id @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// E.164, and optional: a judge who signed up themselves never gave one.
+  ///
+  /// Added for the bulk import, which derives a judge's first password from it the
+  /// way a participant's comes from their CNIC. It also means a judge can sign in
+  /// with their phone number, like everyone else.
+  phoneE164 String? @unique
 
   approvedById String?   @db.Uuid
   approvedBy   User?     @relation("JudgeApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)

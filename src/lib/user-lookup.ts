@@ -38,11 +38,20 @@ export async function findUserByIdentifier(input: string) {
     }
 
     case "phone": {
-      const profile = await db.participantProfile.findUnique({
+      const participant = await db.participantProfile.findUnique({
         where: { phoneE164: identifier.value },
         select: { user: { select } },
       });
-      return profile?.user ?? null;
+      if (participant) return participant.user;
+
+      // Judges have a phone too once they arrive through a bulk import, and the login
+      // box makes no distinction between roles — so neither should this. Checked
+      // second because participants outnumber judges by fifty to one.
+      const judge = await db.judgeProfile.findUnique({
+        where: { phoneE164: identifier.value },
+        select: { user: { select } },
+      });
+      return judge?.user ?? null;
     }
   }
 }
