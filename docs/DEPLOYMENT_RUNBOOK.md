@@ -157,6 +157,21 @@ a bad afternoon.
 
 Skip if Step 0 reported a version.
 
+### Before you paste anything with `sudo` in it
+
+Run this on its own first and enter your password:
+
+```bash
+sudo -v
+```
+
+Pasting a multi-line block that contains `sudo` without doing this **silently breaks
+the block**. The first `sudo` stops and prompts for a password; the terminal feeds it
+the *next line of your paste* as the password, gets `Sorry, try again`, and eats the
+line after that too. You end up with two or three commands consumed as failed password
+attempts and no obvious sign which ones. `sudo -v` caches the credential for about
+fifteen minutes so nothing prompts mid-paste.
+
 ```bash
 sudo apt-get update
 sudo apt-get install -y ca-certificates curl gnupg git
@@ -175,11 +190,35 @@ sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plug
 sudo usermod -aG docker $USER
 ```
 
-**Log out and back in**, then confirm:
+**Log out and back in** — group membership only applies to a new login session — then
+confirm all four of these:
 
 ```bash
-docker run --rm hello-world
+docker --version                  # the engine
+docker compose version            # the v2 plugin, which is a SEPARATE package
+id -nG | tr ' ' '\n' | grep -x docker && echo "in the docker group"
+docker run --rm hello-world       # proves the daemon works without sudo
+```
+
+All four must pass before Step 8, because `deploy-remote.sh` checks the same things and
+will stop if any is missing.
+
+**If `docker compose version` says "is not a docker command"** you have the engine but
+not the Compose v2 plugin — most likely because Docker came from Ubuntu's own
+`docker.io` package rather than from Docker's repository above. Either is fine, but the
+plugin has to be installed explicitly:
+
+```bash
+sudo apt-get install -y docker-compose-v2
 docker compose version
+```
+
+**If `docker run hello-world` says "permission denied ... docker.sock"** the `usermod`
+line did not take effect. Run it again and start a completely new SSH session:
+
+```bash
+sudo usermod -aG docker $USER
+exit
 ```
 
 ---
