@@ -73,10 +73,27 @@ if [[ -n "$(git status --porcelain)" ]]; then
   DIRTY="-dirty"
 fi
 
+# Docker tags are narrower than branch names: [A-Za-z0-9_][A-Za-z0-9._-]{0,127}, and
+# notably no slashes. A release branch called `release-wtq-sp/v1.0.0` would otherwise
+# produce `wtq-portal:release-wtq-sp/v1.0.0-900a4be`, which docker rejects as an
+# invalid reference — after the tree has already been copied to the VM.
+docker_tag() {
+  printf '%s' "$1" \
+    | sed 's/[^A-Za-z0-9._-]/-/g; s/^[^A-Za-z0-9_]*//' \
+    | cut -c1-128
+}
+
 # The tag names the exact code running on the VM, so `docker ps` answers "what is
 # deployed?" without anyone having to remember. It is also what a rollback selects.
 SHORT_SHA="$(git rev-parse --short HEAD)"
-IMAGE_TAG="${IMAGE_TAG:-${BRANCH}-${SHORT_SHA}${DIRTY}}"
+RAW_TAG="${IMAGE_TAG:-${BRANCH}-${SHORT_SHA}${DIRTY}}"
+IMAGE_TAG="$(docker_tag "$RAW_TAG")"
+
+if [[ "$IMAGE_TAG" != "$RAW_TAG" ]]; then
+  echo "note: '${RAW_TAG}' is not a valid docker tag; using '${IMAGE_TAG}'" >&2
+fi
+
+[[ -n "$IMAGE_TAG" ]] || { echo "error: could not derive a usable image tag from '$RAW_TAG'" >&2; exit 1; }
 
 REMOTE_SSH="${REMOTE_USER}@${REMOTE_HOST}"
 

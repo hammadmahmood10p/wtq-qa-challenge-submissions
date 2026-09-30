@@ -53,6 +53,13 @@ docker info >/dev/null 2>&1 || fail "cannot talk to the docker daemon (are you i
 
 [[ -f "$COMPOSE_ENV_FILE" ]] || fail "$COMPOSE_ENV_FILE not found. Copy deploy/production.env.example and fill it in (runbook step 7)"
 
+# Checked here as well as in deploy.sh, because IMAGE_TAG can also arrive from
+# production.env or from someone running this script by hand. Docker's own complaint
+# about an invalid reference does not mention the tag rules, and it surfaces after the
+# build has already started.
+[[ "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$ ]] \
+  || fail "IMAGE_TAG '$IMAGE_TAG' is not a valid docker tag (no slashes; must start with a letter, digit or underscore)"
+
 # A world-readable file holding the session secret and the encryption key is worth one
 # line to prevent.
 PERMS="$(stat -c '%a' "$COMPOSE_ENV_FILE")"
