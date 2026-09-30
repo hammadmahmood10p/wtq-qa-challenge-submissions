@@ -4,7 +4,12 @@ import { Bug, ChevronDown, FlaskConical, Save, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { inputClasses } from "@/components/ui/field";
-import { DESCRIPTION_MAX, TITLE_MAX } from "@/lib/challenge1-limits";
+import {
+  DESCRIPTION_MAX,
+  TITLE_MAX,
+  isEntryComplete,
+  missingEntryParts,
+} from "@/lib/challenge1-limits";
 import { cn } from "@/lib/utils";
 import { EvidenceStrip, imageFromPaste, type Evidence } from "./evidence-strip";
 import { SaveIndicator, type SaveState } from "./save-indicator";
@@ -77,6 +82,8 @@ export function EntryDrawer({
   }, [expanded]);
 
   const heading = entry.bugTitle.trim() || "Untitled finding";
+  const complete = isEntryComplete(entry);
+  const missing = missingEntryParts(entry);
 
   /** A pasted screenshot is evidence, not text — intercept it before it lands. */
   function onPaste(slot: "BUG" | "TEST") {
@@ -140,9 +147,20 @@ export function EntryDrawer({
           >
             {heading}
           </span>
-          {entry.testTitle.trim() && (
-            <span className="border-border text-muted hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] sm:inline">
-              test case
+          {/* Whether this finding will actually be handed in. Stated on the closed
+              drawer, because that is what someone scanning forty of them sees, and
+              discovering at submission time that half were never counted is the
+              failure this is here to prevent. */}
+          {complete ? (
+            <span className="border-success/40 bg-success/10 text-success-strong hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium sm:inline">
+              Counted
+            </span>
+          ) : (
+            <span
+              title={`Still needs: ${missing.join(", ")}`}
+              className="border-warning/40 bg-warning/10 text-warning-strong hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium sm:inline"
+            >
+              Not counted yet
             </span>
           )}
         </button>
@@ -281,6 +299,15 @@ export function EntryDrawer({
                 </div>
               </section>
             </div>
+
+            {/* Said in full where there is room for it, since the pill on the header
+                only has space to say that something is wrong, not what. */}
+            {!complete && (
+              <p className="border-warning/30 bg-warning/8 text-warning-strong border-t px-4 py-2.5 text-xs">
+                This finding will not be handed in until you fill in the{" "}
+                {missing.join(", ").replace(/, ([^,]*)$/, " and $1")}.
+              </p>
+            )}
 
             <div className="border-border flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3">
               {confirmingDelete ? (

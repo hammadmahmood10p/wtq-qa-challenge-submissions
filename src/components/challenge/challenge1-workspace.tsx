@@ -11,7 +11,7 @@ import {
 } from "@/app/actions/challenge1";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { MAX_ENTRIES } from "@/lib/challenge1-limits";
+import { MAX_ENTRIES, isEntryComplete } from "@/lib/challenge1-limits";
 import { retrySave, type RetryHandle } from "@/lib/retry-save";
 import { EntryDrawer, type DrawerEntry } from "./entry-drawer";
 import type { Evidence } from "./evidence-strip";
@@ -252,14 +252,29 @@ export function Challenge1Workspace({ initialEntries }: { initialEntries: Drawer
   }
 
   const atCap = entries.length >= MAX_ENTRIES;
+  const completeCount = entries.filter(isEntryComplete).length;
+  const incompleteCount = entries.length - completeCount;
 
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="font-display text-lg font-semibold">Your findings</h2>
+
+        {/* The number that matters is the one that will be handed in, so that is the
+            one shown large. A drawer still being written is reported separately
+            rather than folded into the total, which would overstate the work. */}
         {entries.length > 0 && (
-          <p className="text-muted text-xs tabular-nums">
-            {entries.length} of {MAX_ENTRIES}
+          <p className="text-xs tabular-nums">
+            <span className="font-semibold">
+              {completeCount} {completeCount === 1 ? "finding" : "findings"} ready
+            </span>
+            {incompleteCount > 0 && (
+              <span className="text-warning-strong">
+                {" "}
+                · {incompleteCount} unfinished
+              </span>
+            )}
+            <span className="text-muted"> · limit {MAX_ENTRIES}</span>
           </p>
         )}
       </div>

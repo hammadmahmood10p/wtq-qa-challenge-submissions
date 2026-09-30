@@ -12,7 +12,7 @@ import { listChallenge1Entries } from "@/lib/challenge1";
 export const metadata: Metadata = { title: "Challenge 1 submission — WTQ 2026" };
 
 export default async function Challenge1Page() {
-  const { attempt, definition } = await loadChallengePage("C1");
+  const { attempt, definition, progress } = await loadChallengePage("C1");
   const applicationUrl = await getApplicationUrl();
   const entries = await listChallenge1Entries(attempt.id);
 
@@ -20,6 +20,7 @@ export default async function Challenge1Page() {
     <ChallengePageChrome
       remainingMs={attempt.remainingMs}
       totalMs={attempt.durationMinutes * 60_000}
+      progress={progress}
     >
       <header>
         <p className="text-muted font-mono text-[11px] tracking-[0.18em] uppercase">
