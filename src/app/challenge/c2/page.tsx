@@ -11,12 +11,13 @@ import { env } from "@/lib/env";
 export const metadata: Metadata = { title: "Challenge 2 submission — WTQ 2026" };
 
 export default async function Challenge2Page() {
-  const { attempt, definition, submission } = await loadChallengePage("C2");
+  const { attempt, definition, submission, progress } = await loadChallengePage("C2");
 
   return (
     <ChallengePageChrome
       remainingMs={attempt.remainingMs}
       totalMs={attempt.durationMinutes * 60_000}
+      progress={progress}
     >
         <header>
           <p className="text-muted font-mono text-[11px] tracking-[0.18em] uppercase">

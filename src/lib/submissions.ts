@@ -1,6 +1,9 @@
 import "server-only";
 
 import type { Prisma } from "@/generated/prisma/client";
+import { progressForAttempts } from "@/lib/attempt-progress";
+import { TOTAL_CHALLENGES } from "@/lib/challenge-progress";
+import { isEntryComplete } from "@/lib/challenge1-limits";
 import { decryptCnic } from "@/lib/crypto";
 import { db } from "@/lib/db";
 import { maxScoreFor } from "@/lib/scoring";
@@ -45,6 +48,16 @@ export interface SubmissionRow {
   judgeName: string | null;
   judgeId: string | null;
   assigned: boolean;
+
+  /**
+   * How many of the three challenges this participant actually finished.
+   *
+   * Counted the same way the participant's own screen counted it, so a judge and a
+   * participant never disagree about what was handed in. Half-written work does not
+   * count: see src/lib/challenge-progress.ts.
+   */
+  challengesCompleted: number;
+  challengesTotal: number;
 }
 
 function orderBy(
@@ -133,6 +146,11 @@ export async function listSubmissions(query: SubmissionsQuery) {
     }),
   ]);
 
+  // One pair of queries for the whole page rather than a pair per row.
+  const completed = await progressForAttempts(
+    attempts.map((a) => ({ id: a.id, chosenTrack: a.chosenTrack })),
+  );
+
   const rows: SubmissionRow[] = attempts.map((attempt) => {
     const evaluation = attempt.evaluation;
     const reviewed = evaluation?.status === "SUBMITTED";
@@ -151,6 +169,8 @@ export async function listSubmissions(query: SubmissionsQuery) {
       judgeName: evaluation?.judge.fullName ?? null,
       judgeId: evaluation?.judgeId ?? null,
       assigned: Boolean(evaluation),
+      challengesCompleted: completed.get(attempt.id) ?? 0,
+      challengesTotal: TOTAL_CHALLENGES,
     };
   });
 
@@ -249,6 +269,16 @@ export async function getSubmissionDetail(attemptId: string) {
 
   return {
     ...attempt,
+    /**
+     * Only the findings that were actually finished.
+     *
+     * Filtered rather than deleted at submission time. The visible result is the same
+     * — a judge never sees a half-written drawer — but the participant's text survives
+     * in the database, which matters if anyone ever has to answer "what did she
+     * actually write?" after the fact. Destroying work to tidy a screen is a poor
+     * trade when the screen can simply not show it.
+     */
+    challenge1Entries: attempt.challenge1Entries.filter(isEntryComplete),
     idCardNumber: formatCnic(decryptCnic(attempt.participant.idCardEncrypted)),
   };
 }

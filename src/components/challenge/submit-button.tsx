@@ -1,6 +1,6 @@
 "use client";
 
-import { Send } from "lucide-react";
+import { AlertTriangle, Check, Lock, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { submitEverything } from "@/app/actions/submit";
@@ -8,19 +8,29 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { announceAttemptClosed } from "@/lib/attempt-channel";
+import type { Progress } from "@/lib/challenge-progress";
 
 /**
- * Requirement 5: the Submit button, always active, beside the clock.
+ * Requirement 5: the Submit button, beside the clock.
  *
- * Always active on purpose, even with nothing saved. A participant who has run out of
- * ideas should be able to finish, and a disabled button with no explanation is worse
- * than a confirmation dialog that says plainly what is about to happen.
+ * It used to be active from the first second, on the reasoning that someone who has
+ * run out of ideas should still be able to finish. The organisers have since made
+ * Challenges 1 and 2 compulsory, so it now refuses until both are done — and says
+ * which one is missing, because a disabled button that will not explain itself is the
+ * single most frustrating thing a timed interface can do.
+ *
+ * Nothing here can trap anyone: the clock submits for them when it runs out (D1),
+ * whatever state their work is in. This gate only governs finishing early.
  */
-export function SubmitButton() {
+export function SubmitButton({ progress }: { progress: Progress }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const blocked = !progress.mandatoryComplete;
+  const outstanding = progress.mandatory.filter((item) => !item.complete);
+  const ready = progress.items.filter((item) => item.complete);
 
   function confirm() {
     setError(null);
@@ -46,33 +56,134 @@ export function SubmitButton() {
 
   return (
     <>
-      <Button variant="brand" onClick={() => setOpen(true)}>
-        <Send size={15} />
-        Submit
-      </Button>
+      {/* The hint sits beside the button rather than under it so the sticky header
+          keeps its height and stays aligned with the Information link; two lines of
+          11px are shorter than the button itself. */}
+      <div className="flex items-center gap-2.5">
+        {blocked && (
+          <p
+            id="submit-blocked-reason"
+            className="text-muted max-w-[15rem] text-right text-[11px] leading-snug"
+          >
+            Finish Challenges 1 and 2 to submit. If time runs out first, everything you
+            have saved is submitted automatically — nothing is lost.
+          </p>
+        )}
+
+        <Button
+          variant={blocked ? "secondary" : "brand"}
+          onClick={() => setOpen(true)}
+          // aria-disabled, not disabled. It reads as inactive and refuses to submit,
+          // but stays focusable so it can still explain itself — a truly disabled
+          // control cannot be reached by keyboard or announced, which would leave a
+          // screen-reader user with no way to find out what is missing.
+          aria-disabled={blocked}
+          aria-describedby={blocked ? "submit-blocked-reason" : undefined}
+          className={blocked ? "cursor-not-allowed opacity-60" : undefined}
+        >
+          {blocked ? <Lock size={15} /> : <Send size={15} />}
+          Submit
+        </Button>
+      </div>
 
       <Dialog
         open={open}
         onClose={() => !pending && setOpen(false)}
-        title="Are you sure you want to submit everything?"
+        title={blocked ? "Not ready to submit yet" : "Submit your work?"}
       >
-        <div className="space-y-5">
-          {error && <Alert variant="error">{error}</Alert>}
+        {blocked ? (
+          <div className="space-y-5">
+            <p className="text-muted text-sm">
+              Challenges 1 and 2 are compulsory, so they have to be finished before you
+              can hand everything in. Still outstanding:
+            </p>
 
-          <p className="text-muted text-sm">
-            Once you submit, you will not be able to submit again, and there is no way
-            back to the challenges. Everything you have saved will be sent for review.
-          </p>
+            <ul className="space-y-2">
+              {outstanding.map((item) => (
+                <li
+                  key={item.key}
+                  className="border-warning/40 bg-warning/8 rounded-(--radius-control) border px-3.5 py-2.5"
+                >
+                  <p className="text-warning-strong text-sm font-semibold">
+                    Challenge {item.number} — {item.title}
+                  </p>
+                  <p className="text-muted mt-1 text-xs">
+                    Needs {item.missing.join(", ").replace(/, ([^,]*)$/, " and $1")}.
+                  </p>
+                </li>
+              ))}
+            </ul>
 
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setOpen(false)} disabled={pending}>
-              Cancel
-            </Button>
-            <Button variant="brand" onClick={confirm} loading={pending}>
-              {pending ? "Submitting…" : "Confirm"}
-            </Button>
+            <p className="text-muted text-xs">
+              If the clock runs out first, everything you have saved is submitted
+              automatically — you will not lose it.
+            </p>
+
+            <div className="flex justify-end">
+              <Button variant="secondary" onClick={() => setOpen(false)}>
+                Back to my work
+              </Button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="space-y-5">
+            {error && <Alert variant="error">{error}</Alert>}
+
+            <div>
+              <p className="text-muted text-sm">
+                You are about to hand in{" "}
+                <strong className="text-text">
+                  {ready.length} of {progress.total}
+                </strong>{" "}
+                challenges:
+              </p>
+
+              <ul className="mt-3 space-y-2">
+                {ready.map((item) => (
+                  <li
+                    key={item.key}
+                    className="border-success/50 bg-success/10 flex items-start gap-2.5 rounded-(--radius-control) border px-3.5 py-2.5"
+                  >
+                    <Check size={15} className="text-success-strong mt-0.5 shrink-0" />
+                    <span className="text-success-strong text-sm font-semibold">
+                      Challenge {item.number} — {item.title}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Named rather than left as a silent gap. Someone who chose Challenge 3
+                  and did not finish it should see that fact here, while there is still
+                  time to go back to it. */}
+              {ready.length < progress.total && (
+                <p className="text-muted mt-3 text-xs">
+                  Anything not listed above is unfinished and will not be reviewed.
+                </p>
+              )}
+            </div>
+
+            <div className="border-danger/40 bg-danger/8 rounded-(--radius-control) border px-4 py-3">
+              <p className="text-danger-strong flex items-center gap-2 text-sm font-bold">
+                <AlertTriangle size={16} className="shrink-0" />
+                This cannot be undone
+              </p>
+              <p className="text-danger-strong mt-1.5 text-sm font-medium">
+                Submitting closes your attempt for good. You will be signed out, you
+                will not be able to log in again, and nothing can be changed or added
+                afterwards.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setOpen(false)} disabled={pending}>
+                Keep working
+              </Button>
+              <Button variant="brand" onClick={confirm} loading={pending}>
+                {pending ? "Submitting…" : "Submit and finish"}
+              </Button>
+            </div>
+          </div>
+        )}
       </Dialog>
     </>
   );

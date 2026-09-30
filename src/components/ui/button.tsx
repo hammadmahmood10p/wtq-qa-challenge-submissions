@@ -26,6 +26,15 @@ const button = cva(
   },
 );
 
+/**
+ * The same styling for a link that does a button's job.
+ *
+ * Navigation belongs in an anchor — it must middle-click, open in a new tab and be
+ * read as a link — but "Continue your challenge" should look like the control it is.
+ * Exported so those cases wear these classes rather than a copy of them.
+ */
+export { button as buttonClasses };
+
 type ButtonProps = React.ComponentProps<"button"> &
   VariantProps<typeof button> & { loading?: boolean };
 

@@ -37,6 +37,9 @@ export function SubmissionsTable({
           <SortableHeader column="name">Full name</SortableHeader>
           <SortableHeader column="location">Location</SortableHeader>
           <Th>Submission</Th>
+          {/* How much of the three they actually finished. Counted from the work
+              itself, so it is true whether they pressed Submit or the clock did. */}
+          <Th className="whitespace-nowrap">Challenges accepted</Th>
           <Th>Review status</Th>
           {/* Requirement 7. Descending first: the interesting end of a score column
               is the top, not the bottom. */}
@@ -49,7 +52,7 @@ export function SubmissionsTable({
 
       <tbody>
         {rows.length === 0 ? (
-          <EmptyRow colSpan={7}>{emptyMessage}</EmptyRow>
+          <EmptyRow colSpan={8}>{emptyMessage}</EmptyRow>
         ) : (
           rows.map((row) => (
             <Tr key={row.attemptId}>
@@ -72,6 +75,11 @@ export function SubmissionsTable({
                   View submission
                   <ExternalLink size={12} />
                 </a>
+              </Td>
+
+              <Td className="tabular-nums whitespace-nowrap">
+                <span className="font-semibold">{row.challengesCompleted}</span>
+                <span className="text-muted"> out of {row.challengesTotal}</span>
               </Td>
 
               <Td className="whitespace-nowrap">

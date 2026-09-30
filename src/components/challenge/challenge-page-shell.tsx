@@ -4,8 +4,10 @@ import { SubmitButton } from "@/components/challenge/submit-button";
 import { Alert } from "@/components/ui/alert";
 import type { ChallengeKey } from "@/generated/prisma/enums";
 import { getAttempt } from "@/lib/attempt";
+import { attemptProgress } from "@/lib/attempt-progress";
 import { requireRole } from "@/lib/auth";
 import { challengeById, isChallengeOpen } from "@/lib/challenge-content";
+import type { Progress } from "@/lib/challenge-progress";
 import { getSubmission } from "@/lib/challenge-submissions";
 
 /**
@@ -24,24 +26,32 @@ export async function loadChallengePage(challenge: ChallengeKey) {
 
   const definition = challengeById(challenge)!;
   const open = isChallengeOpen(definition, attempt.chosenTrack);
-  const submission = await getSubmission(attempt.id, challenge);
 
-  return { attempt, definition, open, submission };
+  // The Submit button lives in this chrome on every challenge page, and it needs to
+  // know what is finished — including work done on the other pages.
+  const [submission, progress] = await Promise.all([
+    getSubmission(attempt.id, challenge),
+    attemptProgress(attempt.id, attempt.chosenTrack),
+  ]);
+
+  return { attempt, definition, open, submission, progress };
 }
 
 export function ChallengePageChrome({
   remainingMs,
   totalMs,
+  progress,
   children,
 }: {
   remainingMs: number;
   totalMs: number;
+  progress: Progress;
   children: React.ReactNode;
 }) {
   return (
     <>
       <ChallengeHeader initialRemainingMs={remainingMs} totalMs={totalMs}>
-        <SubmitButton />
+        <SubmitButton progress={progress} />
       </ChallengeHeader>
       <main className="app-gutter space-y-8 py-8">{children}</main>
     </>

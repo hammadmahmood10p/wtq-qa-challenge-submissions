@@ -1,9 +1,10 @@
-import { Clock, ExternalLink, FileText, Info } from "lucide-react";
+import { ArrowRight, Clock, ExternalLink, FileText, Info } from "lucide-react";
+import Link from "next/link";
 import type { Metadata } from "next";
 import { beginChallenge } from "@/app/actions/attempt";
 import { ChallengeBrief } from "@/components/challenge/challenge-brief";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { getAttempt } from "@/lib/attempt";
 import { requireRole } from "@/lib/auth";
 import { AppHeader } from "@/components/app-header";
@@ -60,9 +61,9 @@ export default async function ChallengeBriefingPage() {
         </header>
 
         {inProgress && (
-          <Alert variant="info" title="Your challenge is already running">
-            This is your reference copy. Return to the tab with your challenge workspace
-            to carry on working.
+          <Alert variant="info" title="Your challenge is running">
+            Your clock is already counting down. Everything you have saved is safe —
+            carry on from where you left off.
           </Alert>
         )}
 
@@ -147,6 +148,43 @@ export default async function ChallengeBriefingPage() {
                   before the event begins.
                 </Alert>
               )
+            )}
+
+            {/*
+              A way back into the workspace, in the slot the begin button occupies
+              before the clock starts.
+
+              This page used to say "return to the tab with your workspace" and leave
+              it at that, which assumes that tab exists. It does not for a participant
+              whose attempt a super admin has handed back: she logs in fresh, lands
+              here, and finds a briefing with no way forward and a clock already
+              running. Nor does it for anyone who closed the tab by accident.
+
+              A link rather than a redirect, because this page is also opened
+              deliberately as a second tab for reference (requirement 1) — sending it
+              straight to the workspace would break that and could leave two workspace
+              tabs fighting over the same attempt.
+
+              Not the brand gradient: that is reserved for the irreversible click
+              (DESIGN_LANGUAGE.md §4.1), and resuming is not one.
+            */}
+            {inProgress && (
+              <section className="border-violet/40 bg-surface shadow-(--shadow-raised) space-y-4 rounded-(--radius-card) border p-6 text-center">
+                <h2 className="font-display text-lg font-semibold">
+                  Carry on where you left off
+                </h2>
+                <p className="text-muted mx-auto max-w-md text-sm">
+                  Your workspace has everything you had saved. The clock has not
+                  stopped, so go back as soon as you are ready.
+                </p>
+                <Link
+                  href="/challenge/run"
+                  className={buttonClasses({ variant: "primary", size: "lg" })}
+                >
+                  <ArrowRight size={16} />
+                  Continue your challenge
+                </Link>
+              </section>
             )}
 
             {/* Requirement 2: shown only before the attempt starts. During the test

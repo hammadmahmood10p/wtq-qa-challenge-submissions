@@ -13,13 +13,14 @@ import { getChallenge4Csv } from "@/lib/event-config";
 export const metadata: Metadata = { title: "Challenge 4 submission — WTQ 2026" };
 
 export default async function Challenge4Page() {
-  const { attempt, definition, open, submission } = await loadChallengePage("C4");
+  const { attempt, definition, open, submission, progress } = await loadChallengePage("C4");
   const csv = await getChallenge4Csv();
 
   return (
     <ChallengePageChrome
       remainingMs={attempt.remainingMs}
       totalMs={attempt.durationMinutes * 60_000}
+      progress={progress}
     >
         <header>
           <p className="text-muted font-mono text-[11px] tracking-[0.18em] uppercase">
