@@ -7,9 +7,29 @@ copied as-is unless it is marked **decide** or **from IT**.
 `docs/DEPLOYMENT.md` explains *why* the stack is shaped this way. This file is the
 *what to type*.
 
-**Target:** `10.0.5.99`, Ubuntu, user `ubuntu`
+**Target:** `10.0.5.99`, Ubuntu 24.04 LTS, user `ubuntu`
 **Access:** hostname supplied by IT, real certificate, HTTPS
 **Database:** PostgreSQL on the VM itself, not in a container
+
+---
+
+## How the pieces fit
+
+Steps 0–7 prepare the machine and are done **once, by hand, on the VM**. From Step 8
+onward every deploy is one command **from your laptop**, and `scripts/deploy.sh` does
+the work — including the very first deploy.
+
+| | Where | What |
+|---|---|---|
+| Steps 0–3 | on the VM | Secure the login, install Docker and PostgreSQL |
+| Steps 4–7 | on the VM | Create the directory, secrets, certificate and `production.env` |
+| Step 8 | **from your laptop** | `scripts/deploy.sh` — copies code, builds, migrates, seeds, starts, waits for health |
+| Steps 9–10 | in the browser / on the VM | Configure the event, firewall, backups |
+
+You do **not** need to clone the repository on the VM. `deploy.sh` copies your working
+tree across every time it runs, and deliberately never overwrites `production.env` or
+`deploy/certs` — which is why those are created by hand first and survive every
+subsequent deploy.
 
 ---
 
@@ -178,7 +198,7 @@ localhost and has to trust Docker's subnet.
 PGVER=$(ls /etc/postgresql | head -1)
 echo "PostgreSQL $PGVER"
 
-# Listen on all interfaces (the firewall in Step 14 is what keeps it private)
+# Listen on all interfaces (the firewall in Step 11 is what keeps it private)
 sudo sed -i "s/^#\?listen_addresses.*/listen_addresses = '*'/" /etc/postgresql/$PGVER/main/postgresql.conf
 
 # Allow Docker's private ranges, password-authenticated
@@ -195,29 +215,20 @@ sudo ss -lntp | grep 5432
 
 ---
 
-## Step 4 — Get the code onto the VM
+## Step 4 — Make the deployment directory
+
+The code arrives in Step 8, copied by `scripts/deploy.sh`. All this step does is create
+the directory the next three steps put things into.
 
 ```bash
-cd ~
-git clone https://github.com/hammadmahmood10p/wtq-qa-challenge-submissions.git wtq
-cd wtq
-git checkout main
-git log --oneline -1
+mkdir -p ~/wtq/deploy/certs
+cd ~/wtq
 ```
 
-If the repository is private, GitHub will ask for credentials — use a personal access
-token as the password, or copy the code across instead:
-
-```powershell
-# On your laptop, from the project folder
-git archive --format=tar.gz -o wtq.tar.gz main
-scp wtq.tar.gz ubuntu@10.0.5.99:~/
-```
-
-```bash
-# On the VM
-mkdir -p ~/wtq && tar -xzf ~/wtq.tar.gz -C ~/wtq && cd ~/wtq
-```
+Nothing else is needed here. If you would rather build on the VM from a git checkout
+instead of copying from your laptop, clone into `~/wtq` — but the certificate and
+`production.env` still go where Steps 6 and 7 put them, and `deploy.sh` will not touch
+either.
 
 ---
 
@@ -316,77 +327,82 @@ git check-ignore -v production.env   # must print a .gitignore line
 
 ---
 
-## Step 8 — Build the images
+## Step 8 — Deploy
+
+**This one runs on your laptop, not on the VM.** Everything up to here was preparation;
+this is the deploy, and it is the same command every time afterwards.
+
+From the project folder, on the branch you want to release:
+
+```bash
+git checkout release-wtq-sp/v1.0.0
+
+SEED_SUPER_ADMIN_EMAIL="hammad.mahmood@10pearls.com" \
+SEED_SUPER_ADMIN_PASSWORD="CHOOSE_A_STRONG_PASSWORD" \
+scripts/deploy.sh 10.0.5.99 release-wtq-sp/v1.0.0
+```
+
+The two `SEED_` values are only needed the **first** time — they create the one account
+that exists to begin with. Every later deploy is just:
+
+```bash
+scripts/deploy.sh 10.0.5.99 release-wtq-sp/v1.0.0
+```
+
+The script copies the working tree, then on the VM runs a preflight, builds, applies
+migrations, ensures the settings and bootstrap admin, starts two app replicas and nginx,
+and waits until health passes through TLS before reporting success. Ten to fifteen
+minutes the first time, mostly the image build; a couple of minutes after that.
+
+It refuses early rather than half-deploying. If preflight fails, nothing has changed —
+read what it said, fix it, run it again.
+
+Two guards to know about:
+
+- The branch argument must match the branch you have checked out.
+- A dirty working tree is refused. For a hotfix:
+  `ALLOW_DIRTY=1 scripts/deploy.sh 10.0.5.99 <branch>`
+
+Afterwards, change that admin password from inside the console, and clear it from your
+shell history.
+
+### If you need to do it by hand
+
+The script is only a wrapper. On the VM, these are the same four operations, in the
+order that matters — migrations before the new containers start, never on container
+boot, because replicas booting together must not race each other applying one
+migration:
 
 ```bash
 cd ~/wtq
 docker compose --env-file production.env build
-docker images | grep wtq
-```
-
-Ten to fifteen minutes on first run. If it fails while fetching fonts or packages, the
-VM has no clean route out — stop and tell me what it printed.
-
----
-
-## Step 9 — Create the schema
-
-```bash
-cd ~/wtq
 docker compose --env-file production.env run --rm migrator
+docker compose --env-file production.env run --rm \
+  -e SEED_SUPER_ADMIN_EMAIL="…" -e SEED_SUPER_ADMIN_PASSWORD="…" \
+  migrator pnpm tsx prisma/seed.ts
+docker compose --env-file production.env up -d --scale app=2
 ```
 
-Expect a list of applied migrations. Confirm the tables exist:
+Confirm the schema landed:
 
 ```bash
 sudo -u postgres psql -d wtq2026 -c '\dt' | head -20
 ```
 
-If this cannot connect, Step 3c is the cause nine times out of ten.
+If the migrator cannot connect, Step 3c is the cause nine times out of ten.
 
----
+### If the connection drops mid-deploy
 
-## Step 10 — Create the first super admin
-
-This is the only account that exists to begin with; everyone else is created from
-inside the console.
+The code is already on the VM. Finish there rather than starting over:
 
 ```bash
-cd ~/wtq
-docker compose --env-file production.env run --rm \
-  -e SEED_SUPER_ADMIN_EMAIL="hammad.mahmood@10pearls.com" \
-  -e SEED_SUPER_ADMIN_PASSWORD="CHOOSE_A_STRONG_PASSWORD" \
-  migrator pnpm tsx prisma/seed.ts
-```
-
-It also writes the default application settings. Run it once. Running it again is
-harmless — it skips an admin that already exists.
-
-Change that password from inside the console after your first login, and do not leave
-it in your shell history:
-
-```bash
-history -d $(history 1)
+ssh ubuntu@10.0.5.99
+cd ~/wtq && ./scripts/deploy-remote.sh release-wtq-sp/v1.0.0
 ```
 
 ---
 
-## Step 11 — Start the stack
-
-```bash
-cd ~/wtq
-docker compose --env-file production.env up -d --scale app=2
-
-docker compose --env-file production.env ps
-```
-
-Two app replicas share one VM and one uploads volume, which is the arrangement
-`STORAGE_LOCAL_SHARED_VOLUME` asserts. Wait for both to report `healthy` — up to a
-minute.
-
----
-
-## Step 12 — Verify
+## Step 9 — Verify
 
 On the VM:
 
@@ -412,7 +428,7 @@ docker compose --env-file production.env logs -f app
 
 ---
 
-## Step 13 — Configure the event ⚠️ easy to forget
+## Step 10 — Configure the event ⚠️ easy to forget
 
 The seed sets every maximum score to `0`, which means *not yet configured*, and the
 judging screens refuse to accept scores until real values are set. Judges cannot work
@@ -429,7 +445,7 @@ In the admin console:
 
 ---
 
-## Step 14 — Firewall and backups
+## Step 11 — Firewall and backups
 
 ### Firewall
 
@@ -446,21 +462,47 @@ benefit; the firewall is what stops the rest of the network reaching it.
 
 ### Backups
 
-Two things must be backed up, and the database alone is not enough — every PDF and
-screenshot lives in a Docker volume.
+Two things need backing up, and they need backing up differently. The database is small
+and changes constantly. The uploads are large and only ever grow.
+
+**Do not take hourly tarballs of the uploads.** A thousand participants can put tens of
+gigabytes into that volume, and seven days of hourly snapshots of it would fill this
+98 GB disk during the event — taking PostgreSQL and the application down with it,
+which is the exact disaster the backups were for.
+
+So: the database is snapshotted hourly and kept, and the uploads are **mirrored**, one
+copy, updated in place.
 
 ```bash
-mkdir -p ~/backups
+sudo apt-get install -y rsync
+mkdir -p ~/backups/db ~/backups/uploads
+
 cat > ~/backup-wtq.sh <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+
+# Refuse to run when the disk is nearly full. A backup that fills the last of the
+# disk turns a recoverable situation into an outage.
+AVAIL_MB=$(df -Pm "$HOME" | awk 'NR==2 {print $4}')
+if [[ "$AVAIL_MB" -lt 5000 ]]; then
+  echo "$(date -Is) SKIPPED — only ${AVAIL_MB}MB free" >&2
+  exit 1
+fi
+
 STAMP=$(date +%Y%m%d-%H%M)
-sudo -u postgres pg_dump -Fc wtq2026 > ~/backups/db-$STAMP.dump
-docker run --rm -v wtq_uploads:/data -v ~/backups:/out alpine \
-  tar czf /out/uploads-$STAMP.tar.gz -C /data .
-find ~/backups -type f -mtime +7 -delete
-echo "backed up $STAMP"
+
+# Small, compressed, point-in-time. Keep a week of these.
+sudo -u postgres pg_dump -Fc wtq2026 > "$HOME/backups/db/db-$STAMP.dump"
+find "$HOME/backups/db" -name 'db-*.dump' -mtime +7 -delete
+
+# One mirror, not a history. Only new and changed files move, so this stays fast
+# however large the volume grows.
+UPLOADS=$(docker volume inspect wtq_uploads -f '{{ .Mountpoint }}')
+sudo rsync -a --delete "$UPLOADS/" "$HOME/backups/uploads/"
+
+echo "$(date -Is) ok — db-$STAMP, uploads mirrored, ${AVAIL_MB}MB free"
 EOF
+
 chmod +x ~/backup-wtq.sh
 ~/backup-wtq.sh
 ```
@@ -471,43 +513,25 @@ Hourly on event day:
 (crontab -l 2>/dev/null; echo "0 * * * * $HOME/backup-wtq.sh >> $HOME/backups/backup.log 2>&1") | crontab -
 ```
 
-**Rehearse the restore before the event.** A backup you have never restored is a
-hypothesis, not a backup.
+### Get a copy off the VM
 
----
+Everything above is on the same disk as the thing it protects, which is no help if the
+disk or the VM goes. Before the event, and again straight after judging, pull a copy to
+somewhere else — from your laptop:
 
-## Every deploy after the first
-
-Steps 8 to 12 are what `scripts/deploy.sh` automates. Once the VM is set up, a deploy
-is one command from your laptop:
-
-```bash
-scripts/deploy.sh 10.0.5.99 main
+```powershell
+scp -r ubuntu@10.0.5.99:~/backups ./wtq-backup-(Get-Date -Format yyyyMMdd)
 ```
 
-It copies the working tree, builds, migrates, seeds, restarts and waits for health,
-refusing early if anything is wrong rather than half-deploying. It never touches
-`production.env`, `deploy/certs`, the uploads volume or the database contents.
+### Rehearse the restore
 
-Two guards worth knowing before the day:
-
-- The branch argument must match the branch you have checked out.
-- A dirty working tree is refused. Override for a hotfix with
-  `ALLOW_DIRTY=1 scripts/deploy.sh 10.0.5.99 main`.
-
-The first deploy still needs the super admin, which the script will pass through:
+A backup nobody has restored is a hypothesis. Once, before the event:
 
 ```bash
-SEED_SUPER_ADMIN_EMAIL="hammad.mahmood@10pearls.com" \
-SEED_SUPER_ADMIN_PASSWORD="…" \
-scripts/deploy.sh 10.0.5.99 main
-```
-
-If the connection drops after the copy, finish on the VM rather than starting over:
-
-```bash
-ssh ubuntu@10.0.5.99
-cd ~/wtq && ./scripts/deploy-remote.sh main
+sudo -u postgres createdb wtq_restore_test
+sudo -u postgres pg_restore -d wtq_restore_test ~/backups/db/db-*.dump
+sudo -u postgres psql -d wtq_restore_test -c 'SELECT count(*) FROM users;'
+sudo -u postgres dropdb wtq_restore_test
 ```
 
 ---
