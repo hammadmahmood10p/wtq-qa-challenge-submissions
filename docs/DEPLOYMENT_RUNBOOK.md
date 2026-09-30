@@ -259,18 +259,49 @@ echo "PostgreSQL $PGVER"
 
 # Listen on all interfaces (the firewall in Step 11 is what keeps it private)
 sudo sed -i "s/^#\?listen_addresses.*/listen_addresses = '*'/" /etc/postgresql/$PGVER/main/postgresql.conf
+```
 
-# Allow Docker's private ranges, password-authenticated
-echo "host    wtq2026    wtq_app    172.16.0.0/12    scram-sha-256" | sudo tee -a /etc/postgresql/$PGVER/main/pg_hba.conf
+Allow Docker's private ranges, password-authenticated. Written as a heredoc rather than
+as `echo … | sudo tee …/pg_hba.conf`, because that line is long enough to wrap in an
+SSH session and it wraps *inside the file path* — producing `_hba.conf: command not
+found` and a `pg_hba.conf` that was never touched. A heredoc has no long line to wrap.
+
+```bash
+sudo tee -a /etc/postgresql/$PGVER/main/pg_hba.conf > /dev/null <<'EOF'
+host    wtq2026    wtq_app    172.16.0.0/12    scram-sha-256
+EOF
 
 sudo systemctl restart postgresql
 ```
 
-Confirm it is listening:
+Confirm the two edits actually landed, rather than assuming:
 
 ```bash
+grep -E "^listen_addresses" /etc/postgresql/$PGVER/main/postgresql.conf
+tail -2 /etc/postgresql/$PGVER/main/pg_hba.conf
 sudo ss -lntp | grep 5432
 ```
+
+You want to see `listen_addresses = '*'`, the `wtq2026` line, and something listening on
+`0.0.0.0:5432`.
+
+### Prove a container can actually reach it
+
+The checks above show the configuration is right. This shows it *works*, which is not
+the same thing, and it is the failure that otherwise surfaces much later as a migrator
+that cannot connect:
+
+```bash
+read -rsp "DB password: " PGPASSWORD; echo
+docker run --rm -e PGPASSWORD \
+  --add-host host.docker.internal:host-gateway \
+  postgres:16 psql -h host.docker.internal -U wtq_app -d wtq2026 \
+  -c "select 'containers can reach postgres' as result"
+unset PGPASSWORD
+```
+
+`read -rsp` keeps the password out of your shell history. If this prints the message,
+Step 3 is genuinely finished.
 
 ---
 
