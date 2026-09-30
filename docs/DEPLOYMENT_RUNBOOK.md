@@ -278,9 +278,13 @@ Confirm the two edits actually landed, rather than assuming:
 
 ```bash
 grep -E "^listen_addresses" /etc/postgresql/$PGVER/main/postgresql.conf
-tail -2 /etc/postgresql/$PGVER/main/pg_hba.conf
+sudo tail -2 /etc/postgresql/$PGVER/main/pg_hba.conf
 sudo ss -lntp | grep 5432
 ```
+
+`pg_hba.conf` is mode 640 owned by root, so reading it needs `sudo` — without it you
+get `Permission denied`, which looks like the file is missing rather than merely
+unreadable.
 
 You want to see `listen_addresses = '*'`, the `wtq2026` line, and something listening on
 `0.0.0.0:5432`.
