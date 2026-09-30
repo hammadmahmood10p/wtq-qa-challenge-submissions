@@ -12,6 +12,14 @@ export const submissionsQuerySchema = z.object({
   q: z.string().trim().max(120).optional(),
   review: z.enum(["ALL", "REVIEWED", "NOT_REVIEWED"]).catch("ALL"),
   location: z.enum(["ALL", "KARACHI", "LAHORE", "ISLAMABAD"]).catch("ALL"),
+  /**
+   * Exact number of challenges finished, or ALL.
+   *
+   * A string rather than a number so it shares the "ALL means unset" convention with
+   * every other filter here — and so `0` cannot be mistaken for absent, which is
+   * exactly the value a judge looking for people who submitted nothing will pick.
+   */
+  challenges: z.enum(["ALL", "0", "1", "2", "3"]).catch("ALL"),
   sort: z.enum(["score", "name", "submitted", "location"]).catch("submitted"),
   dir: z.enum(["asc", "desc"]).catch("desc"),
 });
@@ -27,6 +35,7 @@ export function parseSubmissionsQuery(raw: Record<string, string | string[] | un
     q: first("q"),
     review: first("review"),
     location: first("location"),
+    challenges: first("challenges"),
     sort: first("sort"),
     dir: first("dir"),
   });

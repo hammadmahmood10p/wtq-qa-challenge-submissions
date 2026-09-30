@@ -12,6 +12,20 @@ const REVIEW_OPTIONS = [
   { value: "REVIEWED", label: "Reviewed" },
 ];
 
+/**
+ * Exact matches, phrased the way the column reads.
+ *
+ * "0 out of 3" earns its place: it finds the people who started and handed in nothing
+ * finished, which is a list somebody will want on the day.
+ */
+const CHALLENGE_OPTIONS = [
+  { value: "ALL", label: "Any number of challenges" },
+  { value: "0", label: "0 out of 3" },
+  { value: "1", label: "1 out of 3" },
+  { value: "2", label: "2 out of 3" },
+  { value: "3", label: "3 out of 3" },
+];
+
 export function SubmissionFilters({ showScope }: { showScope?: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -113,6 +127,20 @@ export function SubmissionFilters({ showScope }: { showScope?: boolean }) {
           <option value="KARACHI">Karachi</option>
           <option value="LAHORE">Lahore</option>
           <option value="ISLAMABAD">Islamabad</option>
+        </select>
+
+        <select
+          aria-label="Filter by challenges accepted"
+          value={params.get("challenges") ?? "ALL"}
+          onChange={(e) => apply({ challenges: e.target.value })}
+          className={inputClasses()}
+          style={{ width: "auto" }}
+        >
+          {CHALLENGE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
       </div>
 

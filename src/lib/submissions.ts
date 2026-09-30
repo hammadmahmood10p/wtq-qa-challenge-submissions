@@ -29,6 +29,8 @@ export interface SubmissionsQuery {
   /** Requirement: "Not reviewed" until a judge has finalised a score. */
   review: "ALL" | "REVIEWED" | "NOT_REVIEWED";
   location: "ALL" | "KARACHI" | "LAHORE" | "ISLAMABAD";
+  /** Exact number of challenges finished. Not a database column — see below. */
+  challenges: "ALL" | "0" | "1" | "2" | "3";
   sort: SubmissionSort;
   dir: SortDirection;
 }
@@ -64,19 +66,34 @@ function orderBy(
   sort: SubmissionSort,
   dir: SortDirection,
 ): Prisma.AttemptOrderByWithRelationInput[] {
-  switch (sort) {
-    case "score":
-      // Requirement 7: the Score column sorts. Unscored submissions always sink to the
-      // bottom rather than interleaving — a judge sorting by score is looking for the
-      // high scores, not for the gaps.
-      return [{ evaluation: { totalScore: { sort: dir, nulls: "last" } } }, { submittedAt: "asc" }];
-    case "name":
-      return [{ participant: { user: { fullName: dir } } }];
-    case "location":
-      return [{ participant: { location: dir } }, { participant: { user: { fullName: "asc" } } }];
-    default:
-      return [{ submittedAt: dir }];
-  }
+  const columns: Prisma.AttemptOrderByWithRelationInput[] = (() => {
+    switch (sort) {
+      case "score":
+        // Requirement 7: the Score column sorts. Unscored submissions always sink to
+        // the bottom rather than interleaving — a judge sorting by score is looking
+        // for the high scores, not for the gaps.
+        return [
+          { evaluation: { totalScore: { sort: dir, nulls: "last" } } },
+          { submittedAt: "asc" },
+        ];
+      case "name":
+        return [{ participant: { user: { fullName: dir } } }];
+      case "location":
+        return [{ participant: { location: dir } }, { participant: { user: { fullName: "asc" } } }];
+      default:
+        return [{ submittedAt: dir }];
+    }
+  })();
+
+  // A last resort that can never tie, so the order is total.
+  //
+  // Postgres is free to return equally-ranked rows in any order it likes, and two
+  // participants submitting in the same millisecond — or two unscored submissions —
+  // are equally ranked under every sort above. Without this, the same row could
+  // appear on page one and again on page two while another never appeared at all.
+  // The Challenges Accepted filter makes that worse still, because it reads the ids
+  // in one query and the rows in another, and the two have to agree.
+  return [...columns, { id: "asc" }];
 }
 
 export async function listSubmissions(query: SubmissionsQuery) {
@@ -114,13 +131,52 @@ export async function listSubmissions(query: SubmissionsQuery) {
   }
 
   const where: Prisma.AttemptWhereInput = { AND: conditions };
+  const ordering = orderBy(query.sort, query.dir);
+
+  /**
+   * The Challenges Accepted filter, which cannot be a WHERE clause.
+   *
+   * How many challenges someone finished is derived — from whether their findings are
+   * paired, whether a PDF landed, whether the required questions were answered — and
+   * lives in challenge-progress.ts rather than in a column. Storing it would mean a
+   * migration, a backfill, and a number that silently goes stale the moment the rule
+   * changes or a participant saves another answer.
+   *
+   * So when this filter is on, the ids matching the other filters are read in sort
+   * order, counted, filtered, and only then paginated. It costs one extra query over
+   * a narrow column, and it keeps the filter honest: the number a judge filters by is
+   * the same number the column shows, by construction.
+   */
+  let pageIds: string[] | null = null;
+  let filteredTotal: number | null = null;
+
+  if (query.challenges !== "ALL") {
+    const wanted = Number(query.challenges);
+
+    const candidates = await db.attempt.findMany({
+      where,
+      orderBy: ordering,
+      select: { id: true, chosenTrack: true },
+    });
+
+    const completedByAttempt = await progressForAttempts(candidates);
+    const matching = candidates.filter((a) => completedByAttempt.get(a.id) === wanted);
+
+    filteredTotal = matching.length;
+    pageIds = matching
+      .slice((query.page - 1) * SUBMISSIONS_PAGE_SIZE, query.page * SUBMISSIONS_PAGE_SIZE)
+      .map((a) => a.id);
+  }
 
   const [total, attempts] = await Promise.all([
-    db.attempt.count({ where }),
+    filteredTotal ?? db.attempt.count({ where }),
     db.attempt.findMany({
-      where,
-      orderBy: orderBy(query.sort, query.dir),
-      skip: (query.page - 1) * SUBMISSIONS_PAGE_SIZE,
+      // When the filter narrowed things down the page is already chosen by id, so the
+      // same ordering is applied again here — IN does not preserve the order it was
+      // given, and the tiebreaker above is what makes the two runs agree.
+      where: pageIds ? { id: { in: pageIds } } : where,
+      orderBy: ordering,
+      skip: pageIds ? 0 : (query.page - 1) * SUBMISSIONS_PAGE_SIZE,
       take: SUBMISSIONS_PAGE_SIZE,
       select: {
         id: true,
