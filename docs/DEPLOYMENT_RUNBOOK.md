@@ -349,7 +349,20 @@ only fix is making a thousand people register again.
 
 ---
 
-## Step 6 — Install the certificate from IT
+## Step 6 — Install a certificate
+
+Two paths. Pick **6B** if IT has not given you a DNS name yet; you can deploy today and
+switch to the real certificate later without redoing anything else.
+
+**What you cannot do is serve this over plain `http://`.** The session cookie is marked
+`Secure` whenever `NODE_ENV=production` (`src/lib/session.ts`), and browsers refuse to
+store a Secure cookie delivered over http. Login would appear to succeed and bounce
+straight back to the login page, for everybody, with nothing in the logs to explain it.
+Hence a self-signed certificate rather than no certificate: it keeps the topology, the
+nginx config and the cookie behaviour identical to production, so the eventual switch
+changes two files and one line.
+
+### 6A — The real certificate from IT
 
 ```bash
 mkdir -p ~/wtq/deploy/certs
@@ -382,6 +395,34 @@ openssl x509 -noout -subject -dates -in ~/wtq/deploy/certs/fullchain.pem
 If the hashes differ, the certificate and key are not a pair and nginx will not start.
 Go back to IT.
 
+### 6B — A self-signed certificate for the IP, while you wait for DNS
+
+Run this **on the VM**. The `subjectAltName` is the part that matters: browsers have
+ignored the common name for years, and a certificate without an `IP:` SAN is rejected
+outright rather than merely warned about.
+
+```bash
+mkdir -p ~/wtq/deploy/certs
+cd ~/wtq
+
+openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
+  -keyout deploy/certs/privkey.pem \
+  -out deploy/certs/fullchain.pem \
+  -subj "/CN=10.0.5.99" \
+  -addext "subjectAltName=IP:10.0.5.99"
+
+chmod 600 deploy/certs/privkey.pem
+openssl x509 -noout -subject -dates -ext subjectAltName -in deploy/certs/fullchain.pem
+```
+
+Everyone who opens the site will get a full-page browser warning and have to choose
+**Advanced → Proceed**. That is correct behaviour, not a fault: the certificate really
+is unverifiable. It is fine while the only people looking are you and your team.
+
+**Do not run the event on this.** A thousand participants being told to click through a
+security warning is both a support problem and a bad habit to teach a room full of QA
+engineers. Chase IT for the real name and certificate before the 10th.
+
 ---
 
 ## Step 7 — Write production.env
@@ -404,7 +445,9 @@ CNIC_PEPPER="…from Step 5…"
 CNIC_ENCRYPTION_KEY="…from Step 5…"
 
 # Must match the certificate's name exactly, and start with https://
-APP_URL="https://qa.10pearls.com"
+#   with DNS (6A):        https://qa.10pearls.com
+#   IP only (6B):         https://10.0.5.99
+APP_URL="https://10.0.5.99"
 
 MAX_UPLOAD_MB="20"
 IMAGE_TAG="wtq-1"
@@ -627,6 +670,45 @@ sudo -u postgres pg_restore -d wtq_restore_test ~/backups/db/db-*.dump
 sudo -u postgres psql -d wtq_restore_test -c 'SELECT count(*) FROM users;'
 sudo -u postgres dropdb wtq_restore_test
 ```
+
+---
+
+## Switching from the IP to the real DNS name
+
+When IT delivers the name and certificate, this is the whole change. Nothing is
+rebuilt, no migration runs, and the database and uploads are untouched.
+
+```bash
+ssh ubuntu@10.0.5.99
+cd ~/wtq
+
+# 1. Replace the two certificate files (scp them up first from your laptop)
+chmod 600 deploy/certs/privkey.pem
+openssl x509 -noout -modulus -in deploy/certs/fullchain.pem | openssl md5
+openssl rsa  -noout -modulus -in deploy/certs/privkey.pem   | openssl md5   # must match
+
+# 2. Point APP_URL at the new name
+nano production.env        # APP_URL="https://qa.10pearls.com"
+
+# 3. Restart only what needs it
+docker compose --env-file production.env up -d --force-recreate app nginx
+```
+
+`app` is recreated as well as `nginx` because `APP_URL` is read at startup and is what
+signed file links are built from — leaving the old value would produce download links
+pointing at the IP from a site served under the name.
+
+Then confirm, from a browser:
+
+- `https://qa.10pearls.com` loads with a **valid padlock and no warning**
+- Log in, and open a participant's uploaded PDF from the judge view — that exercises
+  the signed-link path `APP_URL` feeds
+
+One thing to know about the switch: nginx sends `Strict-Transport-Security` with a
+one-year max-age. Browsers ignore HSTS on a bare IP, so nothing sticks while you are on
+`10.0.5.99` — but from the first load of the real hostname, that browser will refuse
+plain http for that name for a year. That is what you want; it just means the hostname
+must keep working over TLS from then on.
 
 ---
 
