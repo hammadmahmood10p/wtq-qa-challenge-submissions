@@ -476,16 +476,57 @@ hypothesis, not a backup.
 
 ---
 
-## Rollback
+## Every deploy after the first
+
+Steps 8 to 12 are what `scripts/deploy.sh` automates. Once the VM is set up, a deploy
+is one command from your laptop:
 
 ```bash
-cd ~/wtq
-# Point IMAGE_TAG at the previous tag in production.env, then:
-docker compose --env-file production.env up -d --scale app=2
+scripts/deploy.sh 10.0.5.99 main
 ```
 
-This is why Step 7 pins `IMAGE_TAG` to something other than `latest`: a rollback is a
-one-word edit.
+It copies the working tree, builds, migrates, seeds, restarts and waits for health,
+refusing early if anything is wrong rather than half-deploying. It never touches
+`production.env`, `deploy/certs`, the uploads volume or the database contents.
+
+Two guards worth knowing before the day:
+
+- The branch argument must match the branch you have checked out.
+- A dirty working tree is refused. Override for a hotfix with
+  `ALLOW_DIRTY=1 scripts/deploy.sh 10.0.5.99 main`.
+
+The first deploy still needs the super admin, which the script will pass through:
+
+```bash
+SEED_SUPER_ADMIN_EMAIL="hammad.mahmood@10pearls.com" \
+SEED_SUPER_ADMIN_PASSWORD="…" \
+scripts/deploy.sh 10.0.5.99 main
+```
+
+If the connection drops after the copy, finish on the VM rather than starting over:
+
+```bash
+ssh ubuntu@10.0.5.99
+cd ~/wtq && ./scripts/deploy-remote.sh main
+```
+
+---
+
+## Rollback
+
+`scripts/deploy.sh` tags each image `<branch>-<short sha>` and records what it started
+in `~/wtq/.deployed-tag`, so the previous release is always nameable:
+
+```bash
+ssh ubuntu@10.0.5.99
+cd ~/wtq
+docker images | grep wtq-portal          # the tags you have to choose from
+
+IMAGE_TAG=main-97fd772 docker compose --env-file production.env up -d --scale app=2
+```
+
+If a deploy fails partway, `deploy-remote.sh` prints this exact command with the
+previous tag already filled in. A failed deploy leaves the old release serving.
 
 Rolling back **code** is safe. Rolling back the **database** is not — restore a dump
 only if you accept losing everything saved since it was taken.
