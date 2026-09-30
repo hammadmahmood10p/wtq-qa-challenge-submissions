@@ -501,6 +501,37 @@ alphanumeric password, which is no weaker — length is what matters, not punctu
 **This one runs on your laptop, not on the VM.** Everything up to here was preparation;
 this is the deploy, and it is the same command every time afterwards.
 
+### Run it in Git Bash, not PowerShell
+
+`scripts/deploy.sh` is a bash script, and the command below uses the bash idiom
+`VAR=value command`. PowerShell has no inline environment-variable prefix, so it reads
+the first line as a command name and answers:
+
+```
+SEED_SUPER_ADMIN_EMAIL=… : The term '…' is not recognized as the name of a cmdlet
+```
+
+Open **Git Bash** in the project folder — in VS Code, the terminal dropdown has it — and
+run it there.
+
+Do **not** reach for `bash` from PowerShell to get around this. On a machine with WSL
+installed, `bash` resolves to `C:\Windows\System32\bash.exe`, which is WSL's Linux
+environment with its own `~/.ssh`, its own `known_hosts` and no knowledge of the key you
+set up in Step 1. It will prompt for a password, or fail host-key verification, and the
+reason will not be obvious.
+
+If you must stay in PowerShell, call Git Bash by its full path and set the variables the
+PowerShell way:
+
+```powershell
+$env:SEED_SUPER_ADMIN_EMAIL = "hammad.mahmood@10pearls.com"
+$env:SEED_SUPER_ADMIN_PASSWORD = "<a strong password, not one used anywhere else>"
+& 'C:\Program Files\Git\bin\bash.exe' scripts/deploy.sh 10.0.5.99 release-wtq-sp/v1.0.0
+Remove-Item Env:SEED_SUPER_ADMIN_EMAIL, Env:SEED_SUPER_ADMIN_PASSWORD
+```
+
+### The command
+
 From the project folder, on the branch you want to release:
 
 ```bash
