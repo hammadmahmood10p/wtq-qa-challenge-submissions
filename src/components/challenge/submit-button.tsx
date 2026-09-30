@@ -56,14 +56,18 @@ export function SubmitButton({ progress }: { progress: Progress }) {
 
   return (
     <>
+      {/* The hint sits beside the button rather than under it so the sticky header
+          keeps its height and stays aligned with the Information link; two lines of
+          11px are shorter than the button itself. */}
       <div className="flex items-center gap-2.5">
-        {/* Said out loud, next to the button, rather than hidden behind a hover. A
-            participant watching a clock should not have to investigate why they
-            cannot finish. */}
         {blocked && (
-          <span id="submit-blocked-reason" className="text-muted hidden text-xs sm:inline">
-            Finish Challenges 1 and 2 to submit
-          </span>
+          <p
+            id="submit-blocked-reason"
+            className="text-muted max-w-[15rem] text-right text-[11px] leading-snug"
+          >
+            Finish Challenges 1 and 2 to submit. If time runs out first, everything you
+            have saved is submitted automatically — nothing is lost.
+          </p>
         )}
 
         <Button
