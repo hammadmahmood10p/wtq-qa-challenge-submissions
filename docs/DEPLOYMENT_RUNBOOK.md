@@ -90,8 +90,18 @@ systemctl is-active postgresql 2>/dev/null                  || echo "postgres se
 command -v git     >/dev/null && git --version              || echo "git: NOT installed"
 
 echo "── internet access? ──"
-curl -fsS -m 10 -o /dev/null -w "docker hub: %{http_code}\n" https://registry-1.docker.io/v2/ || echo "docker hub: UNREACHABLE"
-curl -fsS -m 10 -o /dev/null -w "github:     %{http_code}\n" https://github.com          || echo "github: UNREACHABLE"
+# No -f here. registry-1.docker.io/v2/ answers 401 to an unauthenticated request by
+# design, and -f would report that correct answer as a failure — which it did, once.
+# What matters is that an HTTP response came back at all: 401 or 200 both mean
+# reachable, 000 means nothing answered.
+for probe in "docker hub|https://registry-1.docker.io/v2/" "github|https://github.com"; do
+  name="${probe%%|*}"; url="${probe#*|}"
+  code=$(curl -sS -m 10 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || echo 000)
+  case "$code" in
+    000) echo "$name: UNREACHABLE" ;;
+    *)   echo "$name: reachable (HTTP $code)" ;;
+  esac
+done
 env | grep -i proxy || echo "no proxy variables set"
 
 echo "── sudo? ──"
@@ -104,9 +114,19 @@ sudo -n true 2>/dev/null && echo "sudo: passwordless" || echo "sudo: needs passw
 |---|---|
 | Docker missing | Do Step 2 |
 | PostgreSQL missing | Do Step 3 in full |
-| Docker Hub unreachable | Stop — you need the offline path, ask me |
+| Either host says `UNREACHABLE` | Stop — you need the offline path, ask me |
 | A proxy is set | Stop — Docker needs proxy config, ask me |
 | Less than 4 GB RAM or 40 GB disk | Stop — see *VM sizing* at the end |
+| `*** System restart required ***` at login | Do it now, before installing anything |
+
+If the banner also offers a **new Ubuntu release** (`do-release-upgrade`), do **not**
+take it before the event. Security updates on the current release are routine; a
+distribution upgrade days before a one-shot event is not.
+
+```bash
+sudo apt-get update && sudo apt-get upgrade -y
+sudo reboot
+```
 
 ---
 
