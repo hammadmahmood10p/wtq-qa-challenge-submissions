@@ -319,10 +319,14 @@ mkdir -p ~/wtq/deploy/certs
 cd ~/wtq
 ```
 
-Nothing else is needed here. If you would rather build on the VM from a git checkout
-instead of copying from your laptop, clone into `~/wtq` — but the certificate and
-`production.env` still go where Steps 6 and 7 put them, and `deploy.sh` will not touch
-either.
+Nothing else is needed here, and in particular **the repository is not copied yet**.
+That happens in Step 8. Steps 5, 6 and 7 all write files that `deploy.sh` deliberately
+leaves alone, which is exactly why they go first — and why none of them may depend on a
+file from the repository.
+
+If you would rather build on the VM from a git checkout instead of copying from your
+laptop, clone into `~/wtq` — but the certificate and `production.env` still go where
+Steps 6 and 7 put them, and `deploy.sh` will not touch either.
 
 ---
 
@@ -427,40 +431,68 @@ engineers. Chase IT for the real name and certificate before the 10th.
 
 ## Step 7 — Write production.env
 
+Written from scratch rather than copied from `deploy/production.env.example`, because
+that example is part of the repository and **the repository is not on the VM yet** — it
+arrives in Step 8, and Step 8 refuses to run without this file. Copying it here would
+mean copying a file that does not exist, and `nano` would open an empty buffer marked
+`[ New File ]` with no clue that anything went wrong.
+
+Paste the block below on the VM. It writes a complete file with the values still to be
+filled in, so the structure cannot be mangled by a wrapped paste:
+
 ```bash
 cd ~/wtq
-cp deploy/production.env.example production.env
+
+cat > production.env <<'EOF'
+DATABASE_URL="postgresql://wtq_app:CHANGE_ME@host.docker.internal:5432/wtq2026"
+DIRECT_DATABASE_URL="postgresql://wtq_app:CHANGE_ME@host.docker.internal:5432/wtq2026"
+
+SESSION_SECRET="CHANGE_ME"
+CNIC_PEPPER="CHANGE_ME"
+CNIC_ENCRYPTION_KEY="CHANGE_ME"
+
+APP_URL="https://10.0.5.99"
+
+MAX_UPLOAD_MB="20"
+IMAGE_TAG="latest"
+EOF
+
 chmod 600 production.env
 nano production.env
 ```
 
-Fill in, using the database password from Step 3b and the secrets from Step 5:
+Now replace each `CHANGE_ME` with the database password from Step 3b and the three
+secrets from Step 5. `deploy-remote.sh` refuses to deploy while any `CHANGE_ME` remains,
+so a half-filled file stops the deploy rather than producing a broken one.
 
-```ini
-DATABASE_URL="postgresql://wtq_app:YOUR_DB_PASSWORD@host.docker.internal:5432/wtq2026"
-DIRECT_DATABASE_URL="postgresql://wtq_app:YOUR_DB_PASSWORD@host.docker.internal:5432/wtq2026"
+`APP_URL` must match how people actually reach the site, and start with `https://`:
 
-SESSION_SECRET="…from Step 5…"
-CNIC_PEPPER="…from Step 5…"
-CNIC_ENCRYPTION_KEY="…from Step 5…"
+| | |
+|---|---|
+| Real DNS name (6A) | `https://qa.10pearls.com` |
+| IP only (6B) | `https://10.0.5.99` |
 
-# Must match the certificate's name exactly, and start with https://
-#   with DNS (6A):        https://qa.10pearls.com
-#   IP only (6B):         https://10.0.5.99
-APP_URL="https://10.0.5.99"
+A mismatch produces download links pointing at the wrong host, which a judge discovers
+only when a PDF will not open.
 
-MAX_UPLOAD_MB="20"
-IMAGE_TAG="wtq-1"
-```
+### If your database password has punctuation in it
 
-A mismatch between `APP_URL` and the real hostname produces download links pointing at
-the wrong host, which a judge only discovers when a PDF will not open.
+The password sits inside a URL, so characters that mean something to a URL parser have
+to be percent-encoded or the connection fails — or worse, connects as something you did
+not intend:
 
-Confirm it is not tracked by git — this file holds every secret you have:
+| Character | Write it as |
+|---|---|
+| `@` | `%40` |
+| `:` | `%3A` |
+| `/` | `%2F` |
+| `?` | `%3F` |
+| `#` | `%23` |
+| `+` | `%2B` |
+| `%` | `%25` |
 
-```bash
-git check-ignore -v production.env   # must print a .gitignore line
-```
+Letters and digits need nothing. The simplest way to avoid the whole question is a long
+alphanumeric password, which is no weaker — length is what matters, not punctuation.
 
 ---
 
