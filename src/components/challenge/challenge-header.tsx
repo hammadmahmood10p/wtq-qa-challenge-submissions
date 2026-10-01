@@ -135,6 +135,28 @@ export function ChallengeHeader({
             </p>
           </div>
 
+          {/*
+            What the clock actually measures.
+
+            Participants were reading it as a per-challenge allowance — three hours for
+            Challenge 1, then another three for Challenge 2 — and only discovering
+            otherwise when it ran out. That is not a mistake anyone can recover from at
+            the two-hour mark, so the correction sits permanently beside the number
+            rather than in the briefing they read once before starting.
+
+            Beside the clock rather than under it: two lines of small text are shorter
+            than the digits, so the sticky header keeps its height on every page.
+          */}
+          <div className="border-border max-w-[15rem] border-l pl-3 sm:pl-4">
+            <p className="text-warning-strong text-xs font-semibold">
+              One clock for all three challenges
+            </p>
+            <p className="text-muted mt-0.5 hidden text-[11px] leading-snug sm:block">
+              Not three hours each. When it reaches zero, everything you have saved is
+              submitted automatically.
+            </p>
+          </div>
+
           {/* Announced at intervals rather than every second, which would make a
               screen reader unusable (DESIGN_LANGUAGE.md §5). */}
           <p aria-live="polite" className="sr-only">
