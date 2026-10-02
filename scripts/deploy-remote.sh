@@ -107,6 +107,41 @@ rollback_hint() {
   fi
 }
 
+# --- prune files the release no longer contains --------------------------------
+# deploy.sh copies with tar, which only ever adds. Without this, a file deleted from
+# the repository stays on the VM for good — and `next build` type-checks every file it
+# finds, so one orphan that imports something since renamed fails the build with an
+# error about code nobody has touched.
+#
+# Confined to directories that hold nothing but source. production.env, deploy/certs,
+# node_modules, .next, backups and .deployed-tag are all outside the allowlist and
+# cannot be reached by this, whatever the manifest says.
+
+PRUNE_DIRS=(src prisma public scripts e2e docs loadtest/k6)
+
+if [[ -f .deploy-manifest ]]; then
+  say "Pruning files no longer in the release"
+
+  sort .deploy-manifest > /tmp/wtq-manifest.$$
+
+  for dir in "${PRUNE_DIRS[@]}"; do
+    [[ -d "$dir" ]] || continue
+
+    # `comm -23` is "lines only in the first list": on disk, but not in the payload.
+    find "$dir" -type f | sed 's|^\./||' | sort > /tmp/wtq-ondisk.$$
+
+    while IFS= read -r stale; do
+      [[ -n "$stale" ]] || continue
+      echo "    removing $stale"
+      rm -f "$stale"
+    done < <(comm -23 /tmp/wtq-ondisk.$$ /tmp/wtq-manifest.$$)
+  done
+
+  rm -f /tmp/wtq-manifest.$$ /tmp/wtq-ondisk.$$
+else
+  echo "warning: no .deploy-manifest — skipping prune. Deleted files will linger." >&2
+fi
+
 # --- build -------------------------------------------------------------------
 
 say "Building images (tag: $IMAGE_TAG)"

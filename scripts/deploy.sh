@@ -101,10 +101,26 @@ echo "==> Deploying ${BRANCH} (${SHORT_SHA}${DIRTY}) to ${REMOTE_SSH}:\$HOME/${R
 
 ssh "$REMOTE_SSH" "mkdir -p \"\$HOME/${REMOTE_PATH}\""
 
+# A list of every file being sent, so the VM can delete the ones that are not.
+#
+# tar only adds. That is deliberate for production.env and deploy/certs, which live
+# only on the VM and must survive every deploy — but it also means a file deleted from
+# the repository lingers there forever. It did: judge-select.tsx was removed in the
+# release that replaced the Judge dropdown, stayed behind on the VM, and failed the
+# build because `next build` type-checks every file it finds, including one nothing
+# imports any more.
+#
+# So the payload now carries a manifest, and deploy-remote.sh prunes against it —
+# inside an allowlist of code directories only, never anywhere a secret lives.
+MANIFEST="${REPO_ROOT}/.deploy-manifest"
+trap 'rm -f "$MANIFEST"' EXIT
+
+git -C "$REPO_ROOT" ls-files --cached --others --exclude-standard > "$MANIFEST"
+echo "==> Copying working tree ($(wc -l < "$MANIFEST" | tr -d ' ') files)"
+
 # Everything excluded here either does not belong on the VM or already exists there
 # and must survive. production.env and deploy/certs are the ones that matter: they are
 # created once, by hand, and are not in the repository.
-echo "==> Copying working tree"
 tar -czf - -C "$REPO_ROOT" \
   --exclude='.git' \
   --exclude='node_modules' \
@@ -118,6 +134,8 @@ tar -czf - -C "$REPO_ROOT" \
   --exclude='deploy/certs' \
   --exclude='test-results' \
   --exclude='playwright-report' \
+  --exclude='loadtest/accounts' \
+  --exclude='loadtest/results' \
   . | ssh "$REMOTE_SSH" "tar -xzf - -C \"\$HOME/${REMOTE_PATH}\""
 
 echo "==> Building and starting on ${REMOTE_SSH}"
