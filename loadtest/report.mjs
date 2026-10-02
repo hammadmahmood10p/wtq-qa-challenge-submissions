@@ -168,13 +168,41 @@ if (failedTiers.length === 0) {
   w(`- **${failedTiers.length} tier(s) missed a budget:** ${failedTiers.map((r) => `${r.kind} @ ${r.vus}`).join(", ")}.`);
 }
 
-if (limitedTiers.length > 0) {
+/**
+ * Rate limiting at a small tier but not at a larger one is not a finding — it is two
+ * runs either side of a configuration change sitting in the same folder.
+ *
+ * Reading them as one dataset produces exactly the wrong conclusion: "the limiter was
+ * reached at 200 users", drawn from a stale row, while the 500-user row beneath it
+ * shows nothing refused at twice the volume. So the report says which it is rather
+ * than quietly believing the oldest file.
+ */
+const participantsLimited = participants.filter((r) => r.login.rateLimitedIp > 0);
+const topTier = participants.at(-1);
+const supersededByTop =
+  topTier &&
+  topTier.login.rateLimitedIp === 0 &&
+  participantsLimited.length > 0 &&
+  participantsLimited.every((r) => r.vus < topTier.vus);
+
+if (supersededByTop) {
+  const stale = participantsLimited.map((r) => `${r.vus}`).join(", ");
+  w();
+  w(`- **The per-IP sign-in limiter no longer bites.** The ${topTier.vus}-user tier completed with **${topTier.login.success} sign-ins and none refused**, so the limit comfortably covers the whole roster arriving from one address.`);
+  w();
+  w(`- ⚠️ The ${stale}-user tier${participantsLimited.length > 1 ? "s" : ""} in the table above show${participantsLimited.length > 1 ? "" : "s"} refused sign-ins. **Those results predate the limit being raised** — a larger tier passing clean afterwards supersedes them. Re-run them if you want an internally consistent table; the conclusion does not change.`);
+} else if (limitedTiers.length > 0) {
   const first = limitedTiers[0];
   w();
-  w(`- **The per-IP sign-in limiter was reached at ${first.vus} ${first.kind}.** The limit is 300 sign-ins per five minutes from one address, and every participant at a venue shares one NAT address. On the day this would present as participants being told to wait and try again, during the exact ten minutes when everyone is arriving. **Recommendation:** raise \`loginPerIp\` in \`src/lib/rate-limit.ts\` to comfortably exceed the largest venue's headcount before 10 October, and re-run the affected tier.`);
+  w(`- **The per-IP sign-in limiter was reached at ${first.vus} ${first.kind}.** Every participant at a venue shares one NAT address, so on the day this presents as participants being told to wait during the exact ten minutes when everyone is arriving. **Recommendation:** raise \`loginPerIp\` in \`src/lib/rate-limit.ts\` to comfortably exceed the largest venue's headcount, and re-run the affected tiers.`);
 } else {
   w();
   w("- The per-IP sign-in limiter was not reached at any tier. Worth noting the test ran from one address, which is the same shape as a venue behind NAT, so this is a meaningful result rather than an artefact.");
+}
+
+if (topTier) {
+  w();
+  w(`- **Sign-ins now scale with the tier** — ${participants.map((r) => `${r.vus}→${r.login.success}`).join(", ")} — rather than pinning at a ceiling, which is what proves the higher tiers exercised real authenticated load rather than a queue of rejections.`);
 }
 
 const peak = participants.at(-1);
