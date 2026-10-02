@@ -101,7 +101,12 @@ const DESCRIPTORS: Record<AuditAction, AuditDescriptor> = {
 
   // --- Judging --------------------------------------------------------------
   "evaluation.assigned": { label: "Took a submission for review", category: "Judging", tone: "neutral" },
-  "evaluation.unassigned": { label: "Released a submission", category: "Judging", tone: "neutral" },
+  "evaluation.unassigned": { label: "Unassigned a submission", category: "Judging", tone: "warning" },
+  "evaluation.reopened": {
+    label: "Reopened a finalised score for re-evaluation",
+    category: "Judging",
+    tone: "warning",
+  },
   "evaluation.score_saved": { label: "Saved scores", category: "Judging", tone: "neutral" },
   "evaluation.submitted": { label: "Finalised a score", category: "Judging", tone: "success" },
   "evaluation.unlocked": {

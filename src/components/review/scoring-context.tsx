@@ -8,7 +8,16 @@ import {
   submitFinalScoreAction,
   unlockEvaluationAction,
 } from "@/app/actions/evaluation";
-import { computeTotal, isComplete, maxScoreFor, rubricFor, scorableChallenges } from "@/lib/scoring";
+import {
+  BONUS_MAX,
+  BONUS_MIN,
+  computeTotal,
+  isBonusChoice,
+  isComplete,
+  maxScoreFor,
+  rubricFor,
+  scorableChallenges,
+} from "@/lib/scoring";
 
 export type EvaluationStatus = "ASSIGNED" | "IN_PROGRESS" | "SUBMITTED";
 
@@ -165,8 +174,11 @@ export function ScoringProvider({
 
   const saveBonusOnly = useCallback(() => {
     const parsed = parseField(bonus);
-    if (parsed === null) {
-      setError("Enter a bonus between -5 and 5.");
+
+    // The interface offers only +5 and -5, so this guards a value that should not be
+    // reachable rather than one a judge can type. The server checks it too.
+    if (parsed === null || !isBonusChoice(parsed)) {
+      setError(`Choose either +${BONUS_MAX} or ${BONUS_MIN}.`);
       return;
     }
 

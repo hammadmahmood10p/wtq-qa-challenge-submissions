@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import {
   BONUS_MAX,
   BONUS_MIN,
+  isBonusChoice,
   computeTotal,
   criterionByKey,
   isComplete,
@@ -45,7 +46,8 @@ export interface EvaluationResult {
 
 interface LoadedEvaluation {
   id: string;
-  judgeId: string;
+  /** Null when nobody currently holds the submission. */
+  judgeId: string | null;
   status: "ASSIGNED" | "IN_PROGRESS" | "SUBMITTED";
   bonusPoints: number | null;
   chosenTrack: "C3" | "C4" | null;
@@ -220,12 +222,15 @@ export async function saveBonus(
     return { ok: false, message: "The bonus only applies to participants who chose Challenge 3." };
   }
 
-  if (!Number.isFinite(bonus) || bonus < BONUS_MIN || bonus > BONUS_MAX) {
-    return { ok: false, message: `The bonus must be between ${BONUS_MIN} and ${BONUS_MAX}.` };
-  }
-
-  if (Math.round(bonus * 2) !== bonus * 2) {
-    return { ok: false, message: "The bonus must be a whole or half number." };
+  // Exactly +5 or exactly -5. The bonus is a verdict on whether the Challenge 3 work
+  // bore out the choice to take it on, not a measurement of how far it did — see
+  // BONUS_CHOICES. Checked here as well as constrained in the interface, because the
+  // interface is not where the rule lives.
+  if (!Number.isFinite(bonus) || !isBonusChoice(bonus)) {
+    return {
+      ok: false,
+      message: `The bonus must be either +${BONUS_MAX} or ${BONUS_MIN}.`,
+    };
   }
 
   await db.evaluation.update({

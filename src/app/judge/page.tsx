@@ -5,7 +5,6 @@ import { SubmissionFilters } from "@/components/submissions/submission-filters";
 import { SubmissionsTable } from "@/components/submissions/submissions-table";
 import { Alert } from "@/components/ui/alert";
 import { requireRole } from "@/lib/auth";
-import { listActiveJudges } from "@/lib/judge-assignment";
 import { listSubmissions, submissionCounts } from "@/lib/submissions";
 import { parseSubmissionsQuery } from "@/lib/validation/submissions";
 
@@ -28,10 +27,9 @@ export default async function JudgeSubmissionsPage({
 
   const query = parseSubmissionsQuery(await searchParams);
 
-  const [{ rows, total, pageCount }, counts, judges] = await Promise.all([
+  const [{ rows, total, pageCount }, counts] = await Promise.all([
     listSubmissions(query),
     submissionCounts(),
-    listActiveJudges(),
   ]);
 
   return (
@@ -60,7 +58,7 @@ export default async function JudgeSubmissionsPage({
 
       <SubmissionsTable
         rows={rows}
-        judges={judges}
+        role="JUDGE"
         emptyMessage="No submissions match these filters."
       />
 

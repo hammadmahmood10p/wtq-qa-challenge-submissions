@@ -3,7 +3,7 @@
 import { HandGrab } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { assignSubmissionAction } from "@/app/actions/evaluation";
+import { claimSubmissionAction } from "@/app/actions/evaluation";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
@@ -17,11 +17,10 @@ import { Button } from "@/components/ui/button";
  */
 export function ClaimBar({
   attemptId,
-  judgeId,
   judgeName,
 }: {
   attemptId: string;
-  judgeId: string;
+  /** The signed-in person, shown on the button so it is clear whose name goes on. */
   judgeName: string;
 }) {
   const router = useRouter();
@@ -49,7 +48,7 @@ export function ClaimBar({
         onClick={() =>
           startTransition(async () => {
             setError(null);
-            const result = await assignSubmissionAction(attemptId, judgeId);
+            const result = await claimSubmissionAction(attemptId);
 
             if (!result.ok) {
               setError(result.message ?? "Could not take this submission.");

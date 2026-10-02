@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  BONUS_CHOICES,
   BONUS_DEFAULT,
   BONUS_MAX,
   BONUS_MIN,
+  isBonusChoice,
   RUBRIC,
   computeTotal,
   criterionByKey,
@@ -146,5 +148,37 @@ describe("criterionByKey", () => {
 
   it("returns undefined for anything else, so a forged key cannot be scored", () => {
     expect(criterionByKey("c1.made_up")).toBeUndefined();
+  });
+});
+
+describe("the Challenge 3 bonus is a verdict, not a range", () => {
+  it("offers exactly two values", () => {
+    expect([...BONUS_CHOICES].sort((a, b) => a - b)).toEqual([BONUS_MIN, BONUS_MAX]);
+  });
+
+  it("accepts only those two", () => {
+    expect(isBonusChoice(5)).toBe(true);
+    expect(isBonusChoice(-5)).toBe(true);
+  });
+
+  it("refuses everything in between", () => {
+    // The values judges were reaching for when this was a free number field. None of
+    // them is defensible, and two judges splitting the difference differently made
+    // their scores incomparable.
+    for (const value of [-4, -2.5, -2, -0.5, 0, 0.5, 2, 2.5, 4, 4.5]) {
+      expect(isBonusChoice(value)).toBe(false);
+    }
+  });
+
+  it("refuses values outside the range entirely", () => {
+    expect(isBonusChoice(6)).toBe(false);
+    expect(isBonusChoice(-6)).toBe(false);
+    expect(isBonusChoice(100)).toBe(false);
+  });
+
+  it("still counts the bonus at its maximum when sizing a Challenge 3 total", () => {
+    // The denominator is unchanged by narrowing the choice: a C3 participant is still
+    // marked out of the same number, they simply get all of the bonus or none of it.
+    expect(maxScoreFor("C3")).toBe(maxScoreFor("C4") + BONUS_MAX);
   });
 });

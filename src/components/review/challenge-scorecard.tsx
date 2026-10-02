@@ -1,11 +1,11 @@
 "use client";
 
 import { Check, Save } from "lucide-react";
+import { inputClasses } from "@/components/ui/field";
 import type { ChallengeKey } from "@/generated/prisma/enums";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { inputClasses } from "@/components/ui/field";
-import { BONUS_MAX, BONUS_MIN, rubricFor } from "@/lib/scoring";
+import { BONUS_CHOICES, BONUS_MAX, BONUS_MIN, rubricFor } from "@/lib/scoring";
 import { cn } from "@/lib/utils";
 import { useScoring } from "./scoring-context";
 
@@ -90,30 +90,62 @@ export function ChallengeScoreCard({ challenge }: { challenge: ChallengeKey }) {
           {/* The button sits beside its field rather than at the far edge of the card:
               at laptop width those are a thousand pixels apart, and a save control
               that far from what it saves reads as belonging to something else. */}
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1.5">
-              <label htmlFor="score-bonus" className="block text-sm font-medium">
-                Challenge 3 bonus
-                <span className="text-muted ml-1 font-normal">
-                  / {BONUS_MIN} to {BONUS_MAX}
-                </span>
-              </label>
-              <p className="text-muted max-w-md text-xs">
-                Granted at +{BONUS_MAX} for taking on Challenge 3. Lower it — as far as{" "}
-                {BONUS_MIN} — where the work does not bear the choice out.
-              </p>
-              <input
-                id="score-bonus"
-                type="number"
-                inputMode="decimal"
-                min={BONUS_MIN}
-                max={BONUS_MAX}
-                step={0.5}
-                disabled={!canScore}
-                value={bonus}
-                onChange={(e) => setBonus(e.target.value)}
-                className={cn(inputClasses(), "tabular max-w-28 disabled:opacity-60")}
-              />
+          {/*
+            Two choices, not a range.
+
+            The bonus is a verdict — the Challenge 3 work either bore out the decision
+            to take it on, or it did not. A free number invited judges to split the
+            difference at +2 or +3, which is a distinction none of them could defend
+            and which made two judges' scores incomparable. Rendered as a radio group
+            so the keyboard and a screen reader get the same two options the mouse does.
+          */}
+          <fieldset disabled={!canScore} className="space-y-3">
+            <legend className="text-sm font-medium">
+              Challenge 3 bonus
+              <span className="text-muted ml-1 font-normal">
+                / +{BONUS_MAX} or {BONUS_MIN}
+              </span>
+            </legend>
+
+            <p className="text-muted max-w-md text-xs">
+              Granted at +{BONUS_MAX} for taking Challenge 3 on. Change it to {BONUS_MIN}{" "}
+              where the work does not bear that choice out. There is nothing in between.
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {BONUS_CHOICES.map((choice) => {
+                const selected = bonus === String(choice);
+
+                return (
+                  <label
+                    key={choice}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2 rounded-(--radius-control) border px-3.5 py-2 text-sm transition-colors",
+                      selected
+                        ? choice > 0
+                          ? "border-success/50 bg-success/10 text-success-strong font-semibold"
+                          : "border-danger/50 bg-danger/10 text-danger-strong font-semibold"
+                        : "border-border hover:bg-surface-raised",
+                      !canScore && "cursor-not-allowed opacity-60",
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="score-bonus"
+                      value={choice}
+                      checked={selected}
+                      onChange={() => setBonus(String(choice))}
+                      className="size-4 accent-[var(--violet)]"
+                    />
+                    <span className="tabular">
+                      {choice > 0 ? `+${choice}` : choice}
+                    </span>
+                    <span className="text-muted text-xs font-normal">
+                      {choice > 0 ? "the work bears it out" : "it does not"}
+                    </span>
+                  </label>
+                );
+              })}
             </div>
 
             {canScore && (
@@ -122,7 +154,7 @@ export function ChallengeScoreCard({ challenge }: { challenge: ChallengeKey }) {
                 Save bonus
               </Button>
             )}
-          </div>
+          </fieldset>
         </div>
       )}
 

@@ -76,6 +76,26 @@ export const BONUS_DEFAULT = 5;
 export const BONUS_MIN = -5;
 export const BONUS_MAX = 5;
 
+/**
+ * The only two values the bonus may take.
+ *
+ * It began as a range, on the reasoning that a judge might want to grant part of it.
+ * The organisers have since decided it is a verdict rather than a measurement: either
+ * the Challenge 3 work bears out the choice to take it on, or it does not, and
+ * anything in between invites two judges to disagree by a point over something neither
+ * can defend.
+ *
+ * Kept as a list rather than as a pair of constants so the interface can render the
+ * options and the server can check membership against the same source.
+ */
+export const BONUS_CHOICES = [BONUS_MAX, BONUS_MIN] as const;
+
+export type BonusChoice = (typeof BONUS_CHOICES)[number];
+
+export function isBonusChoice(value: number): value is BonusChoice {
+  return (BONUS_CHOICES as readonly number[]).includes(value);
+}
+
 export function rubricFor(challenge: ChallengeKey): ChallengeRubric {
   const rubric = RUBRIC.find((r) => r.challenge === challenge);
   if (!rubric) throw new Error(`No rubric for ${challenge}`);

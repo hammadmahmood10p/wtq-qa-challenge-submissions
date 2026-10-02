@@ -53,6 +53,7 @@ export type AuditAction =
   | "attempt.auto_submitted"
   | "evaluation.assigned"
   | "evaluation.unassigned"
+  | "evaluation.reopened"
   | "evaluation.score_saved"
   | "evaluation.submitted"
   | "evaluation.unlocked"

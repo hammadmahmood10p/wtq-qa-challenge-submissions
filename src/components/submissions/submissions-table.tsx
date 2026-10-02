@@ -1,9 +1,8 @@
 import { ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EmptyRow, TableShell, Td, Th, Thead, Tr } from "@/components/ui/table";
-import type { JudgeOption } from "@/lib/judge-assignment";
 import type { SubmissionRow } from "@/lib/submissions";
-import { JudgeSelect } from "./judge-select";
+import { AssignmentActions } from "./assignment-actions";
 import { SortableHeader } from "./sortable-header";
 
 const LOCATION_LABELS: Record<string, string> = {
@@ -22,12 +21,18 @@ const LOCATION_LABELS: Record<string, string> = {
 export function SubmissionsTable({
   rows,
   emptyMessage,
-  judges,
+  role,
 }: {
   rows: SubmissionRow[];
   emptyMessage: string;
-  /** The panel, for the Judge column's dropdown. */
-  judges: JudgeOption[];
+  /**
+   * Who is looking.
+   *
+   * The Judge column reads the same for both, but the verbs beside it do not: a judge
+   * may only take unclaimed work for themselves, while a super admin may release it or
+   * reopen a finalised score.
+   */
+  role: "JUDGE" | "SUPER_ADMIN";
 }) {
   return (
     <TableShell>
@@ -47,12 +52,13 @@ export function SubmissionsTable({
             Score
           </SortableHeader>
           <Th>Judge</Th>
+          <Th>Actions</Th>
         </Tr>
       </Thead>
 
       <tbody>
         {rows.length === 0 ? (
-          <EmptyRow colSpan={8}>{emptyMessage}</EmptyRow>
+          <EmptyRow colSpan={9}>{emptyMessage}</EmptyRow>
         ) : (
           rows.map((row) => (
             <Tr key={row.attemptId}>
@@ -105,12 +111,23 @@ export function SubmissionsTable({
                 )}
               </Td>
 
+              {/* Who holds it — a name, not a control. Judges were putting each
+                  other's names against submissions by accident when this was a
+                  dropdown of the whole panel. */}
+              <Td className="whitespace-nowrap">
+                {row.judgeName ? (
+                  <span className="text-sm font-medium">{row.judgeName}</span>
+                ) : (
+                  <span className="text-muted text-sm">Unassigned</span>
+                )}
+              </Td>
+
               <Td>
-                <JudgeSelect
+                <AssignmentActions
                   attemptId={row.attemptId}
-                  judgeId={row.judgeId}
-                  judges={judges}
-                  locked={row.reviewed}
+                  judgeName={row.judgeName}
+                  reviewed={row.reviewed}
+                  role={role}
                 />
               </Td>
             </Tr>
