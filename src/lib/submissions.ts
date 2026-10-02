@@ -222,9 +222,12 @@ export async function listSubmissions(query: SubmissionsQuery) {
       // Empty until the review is finalised, per the brief.
       totalScore: reviewed && evaluation?.totalScore ? Number(evaluation.totalScore) : null,
       maxScore: maxScoreFor(attempt.chosenTrack),
-      judgeName: evaluation?.judge.fullName ?? null,
+      judgeName: evaluation?.judge?.fullName ?? null,
       judgeId: evaluation?.judgeId ?? null,
-      assigned: Boolean(evaluation),
+      // "Somebody holds this right now" — which, since the judge became nullable, is
+      // no longer the same question as "has this been looked at". A released or
+      // reopened submission has a row full of scores and nobody against it.
+      assigned: Boolean(evaluation?.judgeId),
       challengesCompleted: completed.get(attempt.id) ?? 0,
       challengesTotal: TOTAL_CHALLENGES,
     };

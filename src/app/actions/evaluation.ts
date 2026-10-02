@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 import type { ChallengeKey } from "@/generated/prisma/enums";
 import { requireRole } from "@/lib/auth";
-import { assignSubmission } from "@/lib/judge-assignment";
+import {
+  claimSubmission,
+  reEvaluateSubmission,
+  releaseSubmission,
+} from "@/lib/judge-assignment";
 import {
   saveBonus,
   saveChallengeScores,
@@ -68,18 +72,37 @@ export async function unlockEvaluationAction(
 }
 
 /**
- * Puts a judge's name against a submission, or takes it off.
+ * Takes a submission for yourself.
  *
- * Refreshes the whole table rather than the one row: the point of the name being
+ * No judge parameter, deliberately: the holder is always whoever called this. The
+ * previous version accepted any judge id, which is what made the Judge column a
+ * dropdown and let one judge put another's name against work.
+ *
+ * Refreshes the whole table rather than the one row — the point of the name being
  * there is that the rest of the panel sees it, and a stale list is what causes two
  * judges to open the same submission.
  */
-export async function assignSubmissionAction(
+export async function claimSubmissionAction(attemptId: string): Promise<EvaluationResult> {
+  const who = await actor();
+  const result = await claimSubmission(attemptId, who);
+  if (result.ok) refresh(attemptId);
+  return result;
+}
+
+/** Super admin only: puts a submission back in the pool, keeping its scores. */
+export async function releaseSubmissionAction(attemptId: string): Promise<EvaluationResult> {
+  const who = await actor();
+  const result = await releaseSubmission(attemptId, who);
+  if (result.ok) refresh(attemptId);
+  return result;
+}
+
+/** Super admin only: reopens a finalised score for a second look by any judge. */
+export async function reEvaluateSubmissionAction(
   attemptId: string,
-  judgeId: string | null,
 ): Promise<EvaluationResult> {
   const who = await actor();
-  const result = await assignSubmission(attemptId, judgeId, who);
+  const result = await reEvaluateSubmission(attemptId, who);
   if (result.ok) refresh(attemptId);
   return result;
 }

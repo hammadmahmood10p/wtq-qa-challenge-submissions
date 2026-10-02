@@ -53,6 +53,13 @@ docker info >/dev/null 2>&1 || fail "cannot talk to the docker daemon (are you i
 
 [[ -f "$COMPOSE_ENV_FILE" ]] || fail "$COMPOSE_ENV_FILE not found. Copy deploy/production.env.example and fill it in (runbook step 7)"
 
+# Checked here as well as in deploy.sh, because IMAGE_TAG can also arrive from
+# production.env or from someone running this script by hand. Docker's own complaint
+# about an invalid reference does not mention the tag rules, and it surfaces after the
+# build has already started.
+[[ "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$ ]] \
+  || fail "IMAGE_TAG '$IMAGE_TAG' is not a valid docker tag (no slashes; must start with a letter, digit or underscore)"
+
 # A world-readable file holding the session secret and the encryption key is worth one
 # line to prevent.
 PERMS="$(stat -c '%a' "$COMPOSE_ENV_FILE")"
@@ -99,6 +106,50 @@ rollback_hint() {
     echo "  cd $(pwd) && IMAGE_TAG=$PREVIOUS_TAG docker compose --env-file $COMPOSE_ENV_FILE up -d --scale app=$APP_REPLICAS" >&2
   fi
 }
+
+# --- prune files the release no longer contains --------------------------------
+# deploy.sh copies with tar, which only ever adds. Without this, a file deleted from
+# the repository stays on the VM for good — and `next build` type-checks every file it
+# finds, so one orphan that imports something since renamed fails the build with an
+# error about code nobody has touched.
+#
+# Confined to directories that hold nothing but source. production.env, deploy/certs,
+# node_modules, .next, backups and .deployed-tag are all outside the allowlist and
+# cannot be reached by this, whatever the manifest says.
+
+PRUNE_DIRS=(src prisma public scripts e2e docs loadtest/k6)
+
+if [[ -f .deploy-manifest ]]; then
+  say "Pruning files no longer in the release"
+
+  sort .deploy-manifest > /tmp/wtq-manifest.$$
+
+  for dir in "${PRUNE_DIRS[@]}"; do
+    [[ -d "$dir" ]] || continue
+
+    # `comm -23` is "lines only in the first list": on disk, but not in the payload.
+    find "$dir" -type f | sed 's|^\./||' | sort > /tmp/wtq-ondisk.$$
+
+    while IFS= read -r stale; do
+      [[ -n "$stale" ]] || continue
+      echo "    removing $stale"
+      rm -f "$stale"
+    done < <(comm -23 /tmp/wtq-ondisk.$$ /tmp/wtq-manifest.$$)
+
+    # Then the directories those files left behind.
+    #
+    # Deleting every file under src/generated leaves src/generated/prisma/models and
+    # its siblings standing — empty, but present. `prisma generate` then refuses to
+    # write into a directory that "exists and is not empty" and the build dies on a
+    # path nobody has touched. Repeated until stable, because emptying a directory can
+    # make its parent empty too.
+    while find "$dir" -type d -empty -print -delete 2>/dev/null | grep -q .; do :; done
+  done
+
+  rm -f /tmp/wtq-manifest.$$ /tmp/wtq-ondisk.$$
+else
+  echo "warning: no .deploy-manifest — skipping prune. Deleted files will linger." >&2
+fi
 
 # --- build -------------------------------------------------------------------
 

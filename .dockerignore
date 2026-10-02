@@ -2,6 +2,19 @@ node_modules
 .next
 .git
 .storage
+
+# The generated Prisma client.
+#
+# Both the migrator and builder stages run `prisma generate` themselves, so this is
+# produced inside the image and must never arrive from the build context. A copy that
+# does arrive is at best redundant and at worst fatal: `prisma generate` refuses to
+# write into a directory that "exists and is not empty but doesn't look like a
+# generated Prisma Client", which is exactly what a partial or stale copy looks like.
+src/generated
+
+# Load test working files — generated credentials and results. Never needed in an image.
+loadtest/accounts
+loadtest/results
 .env
 .env.*
 !.env.example

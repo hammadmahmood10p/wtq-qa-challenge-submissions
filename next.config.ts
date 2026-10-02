@@ -40,10 +40,53 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Frame-Options", value: "DENY" },
+          { key: "Content-Security-Policy", value: CSP },
+          // Nothing here needs a camera, a microphone or a location, so nothing here
+          // may ask. Cheap, and it closes the question before anyone raises it.
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+          },
         ],
       },
     ];
   },
 };
+
+/**
+ * Content-Security-Policy, added after the assessment of 1 Oct 2026.
+ *
+ * `'unsafe-inline'` on script-src is a real concession and is called out rather than
+ * buried. Next.js serves its hydration payload as inline <script> tags, and removing
+ * the concession means nonces threaded through a middleware on every response — a
+ * change that fails in ways only some pages show, which is not a change to make nine
+ * days before a one-shot event.
+ *
+ * What remains is still worth having, because the attacks it closes are the ones this
+ * application is actually shaped for: no script may be *loaded* from another origin,
+ * nothing can be framed, no plugin content can run, and — the one that matters most
+ * here — `form-action 'self'` means a stolen page cannot post a participant's
+ * credentials anywhere but back to us.
+ *
+ * `style-src` needs 'unsafe-inline' too: the countdown ring and the timer colours are
+ * set as inline style attributes, computed per render from the time remaining.
+ *
+ * Revisit after the event, when nonces can be introduced and tested properly.
+ */
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  // data: for the inlined SVG icons, blob: for client-side image previews of evidence
+  // before it is uploaded.
+  "img-src 'self' data: blob:",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "upgrade-insecure-requests",
+].join("; ");
 
 export default nextConfig;

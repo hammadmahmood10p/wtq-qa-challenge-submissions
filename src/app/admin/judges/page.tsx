@@ -55,7 +55,7 @@ export default async function JudgesPage({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <BulkImportDialog kind="judge" />
-          <BulkDeleteDialog kind="judge" query={query} />
+          <BulkDeleteDialog kind="judge" />
           <AddPersonDialog kind="judge" />
         </div>
       </div>

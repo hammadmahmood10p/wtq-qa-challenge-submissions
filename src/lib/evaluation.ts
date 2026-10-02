@@ -4,8 +4,8 @@ import type { ChallengeKey } from "@/generated/prisma/enums";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import {
-  BONUS_MAX,
-  BONUS_MIN,
+  BONUS_AMOUNT,
+  isBonusValue,
   computeTotal,
   criterionByKey,
   isComplete,
@@ -45,7 +45,8 @@ export interface EvaluationResult {
 
 interface LoadedEvaluation {
   id: string;
-  judgeId: string;
+  /** Null when nobody currently holds the submission. */
+  judgeId: string | null;
   status: "ASSIGNED" | "IN_PROGRESS" | "SUBMITTED";
   bonusPoints: number | null;
   chosenTrack: "C3" | "C4" | null;
@@ -220,12 +221,20 @@ export async function saveBonus(
     return { ok: false, message: "The bonus only applies to participants who chose Challenge 3." };
   }
 
-  if (!Number.isFinite(bonus) || bonus < BONUS_MIN || bonus > BONUS_MAX) {
-    return { ok: false, message: `The bonus must be between ${BONUS_MIN} and ${BONUS_MAX}.` };
+  // Granted or withdrawn, nothing between. Checked here as well as constrained in the
+  // interface, because the interface is not where the rule lives.
+  if (!Number.isFinite(bonus) || !isBonusValue(bonus)) {
+    return {
+      ok: false,
+      message: `The bonus is either kept at +${BONUS_AMOUNT} or withdrawn.`,
+    };
   }
 
-  if (Math.round(bonus * 2) !== bonus * 2) {
-    return { ok: false, message: "The bonus must be a whole or half number." };
+  // Setting it to what it already is would write an audit entry recording a change
+  // that did not happen, and the interface disables the option that would do this —
+  // so arriving here means something went round the interface.
+  if (evaluation.bonusPoints === bonus) {
+    return { ok: true };
   }
 
   await db.evaluation.update({

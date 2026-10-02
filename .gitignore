@@ -64,3 +64,10 @@ next-env.d.ts
 production.env
 deploy/certs/*
 !deploy/certs/.gitkeep
+
+# Load test working files. accounts/ holds generated credentials; results/ is output.
+loadtest/accounts/
+loadtest/results/
+
+# Written by scripts/deploy.sh for one run, then deleted.
+.deploy-manifest

@@ -4,22 +4,21 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { judgeWhere, participantWhere } from "@/lib/roster";
 import { storage } from "@/lib/storage";
-import { rosterQuerySchema, type RosterQuery } from "@/lib/validation/admin";
 
 /**
- * Permanently deleting accounts in bulk.
+ * Permanently deleting accounts, chosen one by one.
  *
  * This exists for test data. One run of the bulk import makes a thousand accounts, and
  * clearing them afterwards should not mean opening a SQL client — that is how someone
  * ends up running a DELETE with no WHERE clause the night before the event.
  *
- * Which makes the design problem the opposite of the import's. The import should be
- * easy; this should be hard to do by accident. So it deletes exactly the set the admin
- * is already looking at, tells them how many that is and names some of them, says out
- * loud when submitted work is among them, never touches a super admin, and will not
- * run until the count has been typed back.
+ * It used to delete whatever the table's filters matched, with the count typed back as
+ * confirmation. That was safe but indirect: you confirmed a *number*, trusting that the
+ * filter still meant what you thought. Now the admin ticks the actual rows, so the
+ * thing confirmed is the thing seen. The server is told ids and deletes exactly those —
+ * no filter is re-evaluated at delete time, so nothing can drift between choosing and
+ * confirming.
  *
  * It is a real delete, not the soft one the per-row Remove button performs. Soft
  * deletes are right for someone taken out of the event by mistake; they are useless for
@@ -29,55 +28,70 @@ import { rosterQuerySchema, type RosterQuery } from "@/lib/validation/admin";
 /** Deleted in chunks so a thousand-row cascade cannot outrun a transaction timeout. */
 const CHUNK = 100;
 
-export interface DeletePreview {
-  total: number;
-  /** A few names, so the admin can see what they are about to destroy. */
-  sample: { fullName: string; email: string }[];
-  /** How many of them have work that will go with them. */
-  withWork: number;
+/** Guards against anything that is not an id reaching a query. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export interface DeletableRow {
+  id: string;
+  fullName: string;
+  email: string;
+  status: string;
+  location: string | null;
+  /**
+   * Whether deleting this one destroys something.
+   *
+   * A participant who has submitted, or a judge holding reviews. Shown against the row
+   * so the consequence is visible at the moment of ticking the box, rather than as a
+   * count in a dialog after the choice is made.
+   */
+  hasWork: boolean;
 }
 
-function whereFor(kind: "participant" | "judge", query: RosterQuery) {
-  return kind === "participant" ? participantWhere(query) : judgeWhere(query);
-}
-
-export async function previewBulkDelete(
-  kind: "participant" | "judge",
-  rawQuery: RosterQuery,
-): Promise<DeletePreview> {
+/**
+ * Everyone who could be deleted, in one list.
+ *
+ * Deliberately not filtered by whatever the table happens to be showing: this is a
+ * cleanup tool, and an account hidden by a filter is exactly the one you forget to
+ * remove. Removed accounts are included too — soft-deleted rows are still rows, and
+ * clearing them is the job.
+ */
+export async function listDeletable(kind: "participant" | "judge"): Promise<DeletableRow[]> {
   await requireRole("SUPER_ADMIN");
 
-  // Re-parsed rather than trusted: this argument crosses the wire, and it decides
-  // which rows get destroyed.
-  const query = rosterQuerySchema.parse(rawQuery);
-  const where = whereFor(kind, query);
+  const role = kind === "participant" ? "PARTICIPANT" : "JUDGE";
 
-  const [total, sample] = await Promise.all([
-    db.user.count({ where }),
-    db.user.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      take: 8,
-      select: { fullName: true, email: true },
-    }),
-  ]);
+  const users = await db.user.findMany({
+    where: { role },
+    orderBy: [{ fullName: "asc" }],
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      status: true,
+      participantProfile: {
+        select: {
+          location: true,
+          attempt: { select: { state: true } },
+        },
+      },
+      // One cheap boolean per judge rather than a count: all that matters is whether
+      // there is anything to lose.
+      _count: kind === "judge" ? { select: { evaluations: true } } : undefined,
+    },
+  });
 
-  // "Work" means different things either side: a participant's own submission, or the
-  // reviews a judge has been holding. Both are lost, and both are worth naming before
-  // rather than after.
-  const withWork =
-    kind === "participant"
-      ? await db.user.count({
-          where: {
-            AND: [
-              where,
-              { participantProfile: { attempt: { state: { in: ["SUBMITTED", "EXPIRED"] } } } },
-            ],
-          },
-        })
-      : await db.user.count({ where: { AND: [where, { evaluations: { some: {} } }] } });
-
-  return { total, sample, withWork };
+  return users.map((user) => ({
+    id: user.id,
+    fullName: user.fullName,
+    email: user.email,
+    status: user.status,
+    location: user.participantProfile?.location ?? null,
+    hasWork:
+      kind === "participant"
+        ? user.participantProfile?.attempt?.state === "SUBMITTED" ||
+          user.participantProfile?.attempt?.state === "EXPIRED"
+        : (user._count?.evaluations ?? 0) > 0,
+  }));
 }
 
 export interface DeleteResult {
@@ -87,47 +101,36 @@ export interface DeleteResult {
 }
 
 /**
- * Deletes everything the filter matches.
+ * Deletes exactly the accounts named, and nothing else.
  *
- * The confirmation is the count, typed back, and it is checked here rather than only in
- * the browser: the number the server counts is the number that will be deleted, so a
- * page left open since yesterday showing 40 must not be able to authorise deleting 400.
+ * The role condition in the WHERE clause is the backstop: ids arrive from a browser, so
+ * a request naming a super admin's id must delete nothing rather than be trusted.
  */
-export async function bulkDelete(
+export async function deleteSelected(
   kind: "participant" | "judge",
-  rawQuery: RosterQuery,
-  confirmedCount: number,
+  ids: string[],
 ): Promise<DeleteResult> {
   const admin = await requireRole("SUPER_ADMIN");
 
-  const query = rosterQuerySchema.parse(rawQuery);
-  const where = whereFor(kind, query);
+  const role = kind === "participant" ? "PARTICIPANT" : "JUDGE";
 
-  const targets = await db.user.findMany({ where, select: { id: true } });
-  const ids = targets.map((t) => t.id);
+  // Deduplicated, shape-checked, and never the person doing the deleting.
+  const targets = [...new Set(ids)].filter((id) => UUID.test(id) && id !== admin.id);
 
-  if (ids.length === 0) {
-    return { deleted: 0, filesRemoved: 0, error: "Nothing matches that filter any more." };
-  }
-
-  if (ids.length !== confirmedCount) {
-    return {
-      deleted: 0,
-      filesRemoved: 0,
-      error: `This filter now matches ${ids.length} accounts rather than ${confirmedCount}. Nothing was deleted — check the filter and try again.`,
-    };
+  if (targets.length === 0) {
+    return { deleted: 0, filesRemoved: 0, error: "Nothing was selected." };
   }
 
   // Storage is not transactional, so the keys are collected before anything is removed
   // and the files deleted afterwards. The worst case that way is an orphaned file,
   // which costs disk; the other order risks destroying a file for a database change
   // that then fails.
-  const fileKeys = kind === "participant" ? await uploadKeysFor(ids) : [];
+  const fileKeys = kind === "participant" ? await uploadKeysFor(targets) : [];
 
   let deleted = 0;
 
-  for (let i = 0; i < ids.length; i += CHUNK) {
-    const chunk = ids.slice(i, i + CHUNK);
+  for (let i = 0; i < targets.length; i += CHUNK) {
+    const chunk = targets.slice(i, i + CHUNK);
 
     deleted += await db.$transaction(async (tx) => {
       // An evaluation's judge is a restricting reference, so a judge who has been
@@ -145,9 +148,7 @@ export async function bulkDelete(
       // Profiles, attempts, entries, attachments, submissions and sessions all cascade
       // from the user. Audit rows deliberately do not: the trail outlives the account,
       // with its actor set to null.
-      const result = await tx.user.deleteMany({
-        where: { id: { in: chunk }, role: kind === "participant" ? "PARTICIPANT" : "JUDGE" },
-      });
+      const result = await tx.user.deleteMany({ where: { id: { in: chunk }, role } });
 
       return result.count;
     });
@@ -171,11 +172,7 @@ export async function bulkDelete(
     actorId: admin.id,
     actorRole: "SUPER_ADMIN",
     entityType: "user",
-    metadata: {
-      deleted,
-      filesRemoved,
-      filter: { q: query.q ?? null, status: query.status, location: query.location },
-    },
+    metadata: { deleted, filesRemoved, selected: targets.length },
   });
 
   revalidatePath("/admin");

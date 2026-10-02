@@ -65,8 +65,9 @@ export function SubmitButton({ progress }: { progress: Progress }) {
             id="submit-blocked-reason"
             className="text-muted max-w-[15rem] text-right text-[11px] leading-snug"
           >
-            Finish Challenges 1 and 2 to submit. If time runs out first, everything you
-            have saved is submitted automatically — nothing is lost.
+            Finish Challenges 1 and 2 and choose Challenge 3 or 4 to submit. If time
+            runs out first, everything you have saved is submitted automatically —
+            nothing is lost.
           </p>
         )}
 
@@ -94,8 +95,8 @@ export function SubmitButton({ progress }: { progress: Progress }) {
         {blocked ? (
           <div className="space-y-5">
             <p className="text-muted text-sm">
-              Challenges 1 and 2 are compulsory, so they have to be finished before you
-              can hand everything in. Still outstanding:
+              Challenges 1 and 2 are compulsory, and you must commit to either Challenge 3
+              or Challenge 4, before you can hand everything in. Still outstanding:
             </p>
 
             <ul className="space-y-2">
@@ -112,6 +113,22 @@ export function SubmitButton({ progress }: { progress: Progress }) {
                   </p>
                 </li>
               ))}
+
+              {/* Not a challenge, so it is not in `items` — but it blocks Submit just
+                  as hard, and a list that showed only the two compulsory challenges
+                  would leave someone who had finished both staring at a button that
+                  still refuses them. */}
+              {!progress.trackChosen && (
+                <li className="border-warning/40 bg-warning/8 rounded-(--radius-control) border px-3.5 py-2.5">
+                  <p className="text-warning-strong text-sm font-semibold">
+                    Choose Challenge 3 or Challenge 4
+                  </p>
+                  <p className="text-muted mt-1 text-xs">
+                    They are alternatives and you must commit to one. The choice cannot
+                    be changed afterwards.
+                  </p>
+                </li>
+              )}
             </ul>
 
             <p className="text-muted text-xs">
