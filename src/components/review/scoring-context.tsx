@@ -9,10 +9,9 @@ import {
   unlockEvaluationAction,
 } from "@/app/actions/evaluation";
 import {
-  BONUS_MAX,
-  BONUS_MIN,
+  BONUS_GRANTED,
   computeTotal,
-  isBonusChoice,
+  isBonusValue,
   isComplete,
   maxScoreFor,
   rubricFor,
@@ -44,8 +43,10 @@ interface ScoringState {
 
   values: Record<string, string>;
   setValue: (criterion: string, value: string) => void;
-  bonus: string;
-  setBonus: (value: string) => void;
+  /** Whether the Challenge 3 bonus is currently on the participant's total. */
+  bonusGranted: boolean;
+  /** Moves it. Saves immediately — there is nothing to type, so nothing to confirm. */
+  setBonusTo: (value: number) => void;
 
   total: number;
   maxTotal: number;
@@ -58,7 +59,6 @@ interface ScoringState {
   savedAt: Partial<Record<ChallengeKey, number>>;
 
   saveChallenge: (challenge: ChallengeKey) => void;
-  saveBonusValue: () => void;
   submitFinal: () => Promise<boolean>;
   unlock: (reason: string) => Promise<boolean>;
 }
@@ -112,7 +112,12 @@ export function ScoringProvider({
     }
     return seeded;
   });
-  const [bonus, setBonusValue] = useState(initialBonus === null ? "" : String(initialBonus));
+  // Null means the evaluation row predates the grant — treated as granted, because the
+  // five points belong to the participant from the moment they chose Challenge 3, not
+  // from the moment a judge first opened the scorecard.
+  const [bonus, setBonusValue] = useState<number>(
+    initialBonus === null ? BONUS_GRANTED : initialBonus,
+  );
 
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [savedAt, setSavedAt] = useState<Partial<Record<ChallengeKey, number>>>({});
@@ -125,12 +130,6 @@ export function ScoringProvider({
     setError(null);
   }, []);
 
-  const setBonus = useCallback((value: string) => {
-    setBonusValue(value);
-    setDirty((prev) => new Set(prev).add("bonus"));
-    setError(null);
-  }, []);
-
   const { total, complete } = useMemo(() => {
     const scores = new Map<string, number>();
     for (const [key, raw] of Object.entries(values)) {
@@ -139,7 +138,8 @@ export function ScoringProvider({
     }
 
     return {
-      total: computeTotal(scores, track, parseField(bonus)),
+      // The bonus is a number already, not a field someone is mid-way through typing.
+      total: computeTotal(scores, track, bonus),
       complete: isComplete(track, new Set(scores.keys())),
     };
   }, [values, bonus, track]);
@@ -172,33 +172,36 @@ export function ScoringProvider({
     [attemptId, values],
   );
 
-  const saveBonusOnly = useCallback(() => {
-    const parsed = parseField(bonus);
+  /**
+   * Moves the bonus and saves in one step.
+   *
+   * There is nothing to type, so there is nothing to confirm — a two-state switch
+   * parked behind a Save button reads as though the click did not register. The value
+   * is applied locally first so the running total moves immediately, and rolled back
+   * if the server refuses.
+   */
+  const setBonusTo = useCallback(
+    (next: number) => {
+      if (!isBonusValue(next)) return;
 
-    // The interface offers only +5 and -5, so this guards a value that should not be
-    // reachable rather than one a judge can type. The server checks it too.
-    if (parsed === null || !isBonusChoice(parsed)) {
-      setError(`Choose either +${BONUS_MAX} or ${BONUS_MIN}.`);
-      return;
-    }
+      const previous = bonus;
+      setBonusValue(next);
+      setError(null);
 
-    setError(null);
-    startTransition(async () => {
-      const result = await saveBonusAction(attemptId, parsed);
+      startTransition(async () => {
+        const result = await saveBonusAction(attemptId, next);
 
-      if (!result.ok) {
-        setError(result.message ?? "Could not save the bonus.");
-        return;
-      }
+        if (!result.ok) {
+          setBonusValue(previous);
+          setError(result.message ?? "Could not change the bonus.");
+          return;
+        }
 
-      setDirty((prev) => {
-        const next = new Set(prev);
-        next.delete("bonus");
-        return next;
+        setStatus((prev) => (prev === "ASSIGNED" ? "IN_PROGRESS" : prev));
       });
-      setStatus((prev) => (prev === "ASSIGNED" ? "IN_PROGRESS" : prev));
-    });
-  }, [attemptId, bonus]);
+    },
+    [attemptId, bonus],
+  );
 
   const submitFinal = useCallback(async () => {
     setError(null);
@@ -241,8 +244,8 @@ export function ScoringProvider({
     canUnlock,
     values,
     setValue,
-    bonus,
-    setBonus,
+    bonusGranted: bonus === BONUS_GRANTED,
+    setBonusTo,
     total,
     maxTotal: maxScoreFor(track),
     complete,
@@ -251,7 +254,6 @@ export function ScoringProvider({
     error,
     savedAt,
     saveChallenge,
-    saveBonusValue: saveBonusOnly,
     submitFinal,
     unlock,
   };

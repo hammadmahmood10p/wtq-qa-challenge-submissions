@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  BONUS_CHOICES,
+  BONUS_AMOUNT,
   BONUS_DEFAULT,
-  BONUS_MAX,
-  BONUS_MIN,
-  isBonusChoice,
+  BONUS_GRANTED,
+  BONUS_VALUES,
+  BONUS_WITHDRAWN,
+  isBonusValue,
   RUBRIC,
   computeTotal,
   criterionByKey,
@@ -58,9 +59,10 @@ describe("scorableChallenges", () => {
 });
 
 describe("maxScoreFor", () => {
-  it("is 105 on the Challenge 3 route, because of the bonus", () => {
-    // 30 (C1) + 30 (C2) + 40 (C3) + 5 bonus
-    expect(maxScoreFor("C3")).toBe(105);
+  it("is 100 on the Challenge 3 route, with the bonus left out of it", () => {
+    // 30 (C1) + 30 (C2) + 40 (C3). The bonus used to be added here, which gave the
+    // two routes different denominators and made their scores incomparable.
+    expect(maxScoreFor("C3")).toBe(100);
   });
 
   it("is 100 on the Challenge 4 route, which carries no bonus", () => {
@@ -84,8 +86,8 @@ describe("computeTotal", () => {
     expect(computeTotal(c4, "C4", 5)).toBe(0);
   });
 
-  it("subtracts a negative bonus", () => {
-    expect(computeTotal(allScored("C3", 0), "C3", BONUS_MIN)).toBe(-5);
+  it("adds nothing when the bonus has been withdrawn", () => {
+    expect(computeTotal(allScored("C3", 0), "C3", BONUS_WITHDRAWN)).toBe(0);
   });
 
   it("ignores scores for a challenge the participant did not take", () => {
@@ -105,7 +107,8 @@ describe("computeTotal", () => {
         .flatMap((c) => rubricFor(c).criteria)
         .map((c) => [c.key, c.max] as const),
     );
-    expect(computeTotal(full, "C3", BONUS_MAX)).toBe(maxScoreFor("C3"));
+    // Full criteria plus the bonus overshoots the denominator on purpose.
+    expect(computeTotal(full, "C3", BONUS_GRANTED)).toBe(maxScoreFor("C3") + BONUS_AMOUNT);
   });
 });
 
@@ -131,13 +134,12 @@ describe("isComplete", () => {
 });
 
 describe("bonus bounds", () => {
-  it("defaults inside its own range", () => {
-    expect(BONUS_DEFAULT).toBeGreaterThanOrEqual(BONUS_MIN);
-    expect(BONUS_DEFAULT).toBeLessThanOrEqual(BONUS_MAX);
+  it("defaults to granted, because choosing Challenge 3 is what earns it", () => {
+    expect(BONUS_DEFAULT).toBe(BONUS_GRANTED);
   });
 
-  it("is signed, so it can be taken away as well as given", () => {
-    expect(BONUS_MIN).toBeLessThan(0);
+  it("withdraws to zero rather than to a penalty", () => {
+    expect(BONUS_WITHDRAWN).toBe(0);
   });
 });
 
@@ -151,34 +153,59 @@ describe("criterionByKey", () => {
   });
 });
 
-describe("the Challenge 3 bonus is a verdict, not a range", () => {
-  it("offers exactly two values", () => {
-    expect([...BONUS_CHOICES].sort((a, b) => a - b)).toEqual([BONUS_MIN, BONUS_MAX]);
+
+describe("the Challenge 3 bonus", () => {
+  it("is granted or withdrawn, with nothing in between", () => {
+    expect([...BONUS_VALUES].sort((a, b) => a - b)).toEqual([BONUS_WITHDRAWN, BONUS_GRANTED]);
+    expect(isBonusValue(BONUS_GRANTED)).toBe(true);
+    expect(isBonusValue(BONUS_WITHDRAWN)).toBe(true);
   });
 
-  it("accepts only those two", () => {
-    expect(isBonusChoice(5)).toBe(true);
-    expect(isBonusChoice(-5)).toBe(true);
+  it("is never a penalty", () => {
+    // -5 used to be storable, which read as "five points off the criteria" rather than
+    // "the five they were given are taken back". Those are different scores.
+    expect(isBonusValue(-5)).toBe(false);
   });
 
-  it("refuses everything in between", () => {
-    // The values judges were reaching for when this was a free number field. None of
-    // them is defensible, and two judges splitting the difference differently made
-    // their scores incomparable.
-    for (const value of [-4, -2.5, -2, -0.5, 0, 0.5, 2, 2.5, 4, 4.5]) {
-      expect(isBonusChoice(value)).toBe(false);
+  it("refuses every partial amount", () => {
+    for (const value of [-4, -2.5, -1, 0.5, 1, 2, 2.5, 4, 4.5, 6]) {
+      expect(isBonusValue(value)).toBe(false);
     }
   });
+});
 
-  it("refuses values outside the range entirely", () => {
-    expect(isBonusChoice(6)).toBe(false);
-    expect(isBonusChoice(-6)).toBe(false);
-    expect(isBonusChoice(100)).toBe(false);
+describe("everything is marked out of 100", () => {
+  it("gives both tracks the same denominator", () => {
+    // The whole point: a Challenge 3 participant's score used to read out of 105 while
+    // a Challenge 4 participant's read out of 100, so the two could not be compared
+    // without knowing which route each had taken.
+    expect(maxScoreFor("C3")).toBe(100);
+    expect(maxScoreFor("C4")).toBe(100);
   });
 
-  it("still counts the bonus at its maximum when sizing a Challenge 3 total", () => {
-    // The denominator is unchanged by narrowing the choice: a C3 participant is still
-    // marked out of the same number, they simply get all of the bonus or none of it.
-    expect(maxScoreFor("C3")).toBe(maxScoreFor("C4") + BONUS_MAX);
+  it("leaves the bonus out of the denominator", () => {
+    expect(maxScoreFor("C3")).not.toBe(100 + BONUS_AMOUNT);
+  });
+
+  it("lets a Challenge 3 participant exceed it", () => {
+    // 105/100 is the maximum, and it is meant to look unusual: it says they did
+    // everything and took the harder route.
+    const full = new Map<string, number>();
+    for (const challenge of scorableChallenges("C3")) {
+      for (const criterion of rubricFor(challenge).criteria) full.set(criterion.key, criterion.max);
+    }
+
+    expect(computeTotal(full, "C3", BONUS_GRANTED)).toBe(105);
+    expect(computeTotal(full, "C3", BONUS_WITHDRAWN)).toBe(100);
+  });
+
+  it("caps a Challenge 4 participant at the denominator", () => {
+    const full = new Map<string, number>();
+    for (const challenge of scorableChallenges("C4")) {
+      for (const criterion of rubricFor(challenge).criteria) full.set(criterion.key, criterion.max);
+    }
+
+    // No bonus on this route, whatever is passed.
+    expect(computeTotal(full, "C4", BONUS_GRANTED)).toBe(100);
   });
 });

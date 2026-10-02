@@ -1,11 +1,11 @@
 "use client";
 
-import { Check, Save } from "lucide-react";
+import { Check, Minus, Plus, Save } from "lucide-react";
 import { inputClasses } from "@/components/ui/field";
 import type { ChallengeKey } from "@/generated/prisma/enums";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { BONUS_CHOICES, BONUS_MAX, BONUS_MIN, rubricFor } from "@/lib/scoring";
+import { BONUS_AMOUNT, BONUS_GRANTED, BONUS_WITHDRAWN, rubricFor } from "@/lib/scoring";
 import { cn } from "@/lib/utils";
 import { useScoring } from "./scoring-context";
 
@@ -30,9 +30,9 @@ export function ChallengeScoreCard({ challenge }: { challenge: ChallengeKey }) {
     dirty,
     savedAt,
     saveChallenge,
-    bonus,
-    setBonus,
-    saveBonusValue,
+    bonusGranted,
+    setBonusTo,
+    maxTotal,
     track,
     status,
   } = useScoring();
@@ -91,70 +91,63 @@ export function ChallengeScoreCard({ challenge }: { challenge: ChallengeKey }) {
               at laptop width those are a thousand pixels apart, and a save control
               that far from what it saves reads as belonging to something else. */}
           {/*
-            Two choices, not a range.
+            A switch, not a score.
 
-            The bonus is a verdict — the Challenge 3 work either bore out the decision
-            to take it on, or it did not. A free number invited judges to split the
-            difference at +2 or +3, which is a distinction none of them could defend
-            and which made two judges' scores incomparable. Rendered as a radio group
-            so the keyboard and a screen reader get the same two options the mouse does.
+            The five points are already on the participant's total — they were granted
+            by choosing Challenge 3, before any judge saw the work. So the only
+            question here is whether to take them away, and the only two states are
+            "still has them" and "does not".
+
+            Each button is disabled when it would change nothing, which makes the
+            current state readable without a separate label: the greyed-out one is
+            where the bonus already is. Clicking saves immediately, because an action
+            phrased as a movement and then parked behind a Save button reads as though
+            it has not happened.
           */}
-          <fieldset disabled={!canScore} className="space-y-3">
-            <legend className="text-sm font-medium">
+          <div className="space-y-3">
+            <p className="text-sm font-medium">
               Challenge 3 bonus
-              <span className="text-muted ml-1 font-normal">
-                / +{BONUS_MAX} or {BONUS_MIN}
+              <span
+                className={cn(
+                  "ml-2 rounded-full border px-2 py-0.5 text-xs font-semibold",
+                  bonusGranted
+                    ? "border-success/40 bg-success/10 text-success-strong"
+                    : "border-muted/30 text-muted",
+                )}
+              >
+                {bonusGranted ? `+${BONUS_AMOUNT} applied` : "withdrawn"}
               </span>
-            </legend>
+            </p>
 
             <p className="text-muted max-w-md text-xs">
-              Granted at +{BONUS_MAX} for taking Challenge 3 on. Change it to {BONUS_MIN}{" "}
-              where the work does not bear that choice out. There is nothing in between.
+              {BONUS_AMOUNT} points the participant already holds for taking Challenge 3
+              on. They are counted on top of the {maxTotal}, so full marks here reads as{" "}
+              {maxTotal + BONUS_AMOUNT}/{maxTotal}. Withdraw them where the work does not
+              bear the choice out.
             </p>
 
             <div className="flex flex-wrap gap-2">
-              {BONUS_CHOICES.map((choice) => {
-                const selected = bonus === String(choice);
-
-                return (
-                  <label
-                    key={choice}
-                    className={cn(
-                      "flex cursor-pointer items-center gap-2 rounded-(--radius-control) border px-3.5 py-2 text-sm transition-colors",
-                      selected
-                        ? choice > 0
-                          ? "border-success/50 bg-success/10 text-success-strong font-semibold"
-                          : "border-danger/50 bg-danger/10 text-danger-strong font-semibold"
-                        : "border-border hover:bg-surface-raised",
-                      !canScore && "cursor-not-allowed opacity-60",
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name="score-bonus"
-                      value={choice}
-                      checked={selected}
-                      onChange={() => setBonus(String(choice))}
-                      className="size-4 accent-[var(--violet)]"
-                    />
-                    <span className="tabular">
-                      {choice > 0 ? `+${choice}` : choice}
-                    </span>
-                    <span className="text-muted text-xs font-normal">
-                      {choice > 0 ? "the work bears it out" : "it does not"}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-
-            {canScore && (
-              <Button variant="secondary" size="sm" onClick={saveBonusValue} disabled={pending}>
-                <Save size={14} />
-                Save bonus
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!canScore || pending || !bonusGranted}
+                onClick={() => setBonusTo(BONUS_WITHDRAWN)}
+              >
+                <Minus size={14} />
+                {BONUS_AMOUNT} — withdraw the bonus
               </Button>
-            )}
-          </fieldset>
+
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!canScore || pending || bonusGranted}
+                onClick={() => setBonusTo(BONUS_GRANTED)}
+              >
+                <Plus size={14} />
+                {BONUS_AMOUNT} — give it back
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 

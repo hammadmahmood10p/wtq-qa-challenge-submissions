@@ -4,9 +4,8 @@ import type { ChallengeKey } from "@/generated/prisma/enums";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import {
-  BONUS_MAX,
-  BONUS_MIN,
-  isBonusChoice,
+  BONUS_AMOUNT,
+  isBonusValue,
   computeTotal,
   criterionByKey,
   isComplete,
@@ -222,15 +221,20 @@ export async function saveBonus(
     return { ok: false, message: "The bonus only applies to participants who chose Challenge 3." };
   }
 
-  // Exactly +5 or exactly -5. The bonus is a verdict on whether the Challenge 3 work
-  // bore out the choice to take it on, not a measurement of how far it did — see
-  // BONUS_CHOICES. Checked here as well as constrained in the interface, because the
-  // interface is not where the rule lives.
-  if (!Number.isFinite(bonus) || !isBonusChoice(bonus)) {
+  // Granted or withdrawn, nothing between. Checked here as well as constrained in the
+  // interface, because the interface is not where the rule lives.
+  if (!Number.isFinite(bonus) || !isBonusValue(bonus)) {
     return {
       ok: false,
-      message: `The bonus must be either +${BONUS_MAX} or ${BONUS_MIN}.`,
+      message: `The bonus is either kept at +${BONUS_AMOUNT} or withdrawn.`,
     };
+  }
+
+  // Setting it to what it already is would write an audit entry recording a change
+  // that did not happen, and the interface disables the option that would do this —
+  // so arriving here means something went round the interface.
+  if (evaluation.bonusPoints === bonus) {
+    return { ok: true };
   }
 
   await db.evaluation.update({

@@ -72,28 +72,36 @@ export const RUBRIC: ChallengeRubric[] = [
  * a super admin. Signed on purpose: where the work does not justify it, the same field
  * can take it away rather than merely withhold it.
  */
-export const BONUS_DEFAULT = 5;
-export const BONUS_MIN = -5;
-export const BONUS_MAX = 5;
-
 /**
- * The only two values the bonus may take.
+ * The Challenge 3 bonus: five points a participant already holds.
  *
- * It began as a range, on the reasoning that a judge might want to grant part of it.
- * The organisers have since decided it is a verdict rather than a measurement: either
- * the Challenge 3 work bears out the choice to take it on, or it does not, and
- * anything in between invites two judges to disagree by a point over something neither
- * can defend.
+ * It is granted by *choosing* Challenge 3, not by a judge deciding to award it. By the
+ * time anyone is marking, the five points are already on the participant's score, and
+ * the only question in front of the judge is whether to take them away.
  *
- * Kept as a list rather than as a pair of constants so the interface can render the
- * options and the server can check membership against the same source.
+ * That is why there are two values and not a range, and why they are 5 and 0 rather
+ * than +5 and -5. "Withdrawn" means the participant keeps their criterion marks and
+ * loses the bonus; it has never meant a five-point penalty on top.
+ *
+ * The buttons are labelled +5 and −5 because those describe the *movement* a judge is
+ * making, which is what they are thinking about. The stored value is the state that
+ * movement arrives at.
  */
-export const BONUS_CHOICES = [BONUS_MAX, BONUS_MIN] as const;
+export const BONUS_GRANTED = 5;
+export const BONUS_WITHDRAWN = 0;
 
-export type BonusChoice = (typeof BONUS_CHOICES)[number];
+/** How much is at stake, for labels. */
+export const BONUS_AMOUNT = BONUS_GRANTED;
 
-export function isBonusChoice(value: number): value is BonusChoice {
-  return (BONUS_CHOICES as readonly number[]).includes(value);
+/** Kept for the participant-facing copy, which advertises the bonus before judging. */
+export const BONUS_DEFAULT = BONUS_GRANTED;
+
+export const BONUS_VALUES = [BONUS_GRANTED, BONUS_WITHDRAWN] as const;
+
+export type BonusValue = (typeof BONUS_VALUES)[number];
+
+export function isBonusValue(value: number): value is BonusValue {
+  return (BONUS_VALUES as readonly number[]).includes(value);
 }
 
 export function rubricFor(challenge: ChallengeKey): ChallengeRubric {
@@ -118,12 +126,23 @@ export function scorableChallenges(track: ChallengeTrack | null): ChallengeKey[]
   return track ? [...base, track] : base;
 }
 
+/**
+ * What a submission is marked out of. Always 100, whichever track was taken.
+ *
+ * The bonus is deliberately *not* in here. It used to be, which made a Challenge 3
+ * participant's score read as 88/105 while a Challenge 4 participant's read as 88/100 —
+ * two different scales for the same event, and an answer to "what did they get out of"
+ * that depended on a choice made three hours earlier.
+ *
+ * Both tracks' criteria sum to exactly 100 (30 + 30 + 40), so the denominator is the
+ * same for everyone and the bonus shows for what it is: five points on top. A
+ * Challenge 3 participant who keeps it and scores full marks reads 105/100, which is
+ * unusual-looking and correct — it says they did everything and took the harder route.
+ */
 export function maxScoreFor(track: ChallengeTrack | null): number {
-  const base = scorableChallenges(track)
+  return scorableChallenges(track)
     .flatMap((c) => rubricFor(c).criteria)
     .reduce((sum, criterion) => sum + criterion.max, 0);
-
-  return track === "C3" ? base + BONUS_MAX : base;
 }
 
 export function isComplete(track: ChallengeTrack | null, scored: Set<string>): boolean {
