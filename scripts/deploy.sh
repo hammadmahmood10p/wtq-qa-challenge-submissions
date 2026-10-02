@@ -136,6 +136,7 @@ tar -czf - -C "$REPO_ROOT" \
   --exclude='playwright-report' \
   --exclude='loadtest/accounts' \
   --exclude='loadtest/results' \
+  --exclude='src/generated' \
   . | ssh "$REMOTE_SSH" "tar -xzf - -C \"\$HOME/${REMOTE_PATH}\""
 
 echo "==> Building and starting on ${REMOTE_SSH}"

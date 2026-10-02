@@ -135,6 +135,15 @@ if [[ -f .deploy-manifest ]]; then
       echo "    removing $stale"
       rm -f "$stale"
     done < <(comm -23 /tmp/wtq-ondisk.$$ /tmp/wtq-manifest.$$)
+
+    # Then the directories those files left behind.
+    #
+    # Deleting every file under src/generated leaves src/generated/prisma/models and
+    # its siblings standing — empty, but present. `prisma generate` then refuses to
+    # write into a directory that "exists and is not empty" and the build dies on a
+    # path nobody has touched. Repeated until stable, because emptying a directory can
+    # make its parent empty too.
+    while find "$dir" -type d -empty -print -delete 2>/dev/null | grep -q .; do :; done
   done
 
   rm -f /tmp/wtq-manifest.$$ /tmp/wtq-ondisk.$$
