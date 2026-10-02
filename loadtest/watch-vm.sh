@@ -37,7 +37,11 @@ summary() {
   echo "────────────────────────────────────────────"
   echo "  system memory used      ${peak_used_mb} MB of $(free -m | awk '/^Mem:/ {print $2}') MB"
   echo "  app containers combined ${peak_app_mb} MB"
-  echo "  database connections    ${peak_conns} (pool ceiling is 20)"
+  if [[ "$peak_conns" -eq 0 ]]; then
+    echo "  database connections    NOT MEASURED — sudo needs a password and no fallback worked"
+  else
+    echo "  database connections    ${peak_conns} (pool ceiling is 20)"
+  fi
   echo
   echo "  Full sample log: ${LOG}"
   echo "────────────────────────────────────────────"
@@ -57,15 +61,29 @@ while true; do
     | awk '/wtq-app/ {gsub(/MiB/,"",$2); sum += $2} END {printf "%d", sum}')
   app_mb=${app_mb:-0}
 
+  # Two routes, because `sudo -n` fails without passwordless sudo — and the first
+  # version of this reported that failure as "0 connections", which reads as a
+  # measurement rather than as the absence of one. A metric that cannot distinguish
+  # "nothing connected" from "I could not look" is worse than no metric.
   conns=$(sudo -n -u postgres psql -tAc \
     "select count(*) from pg_stat_activity where datname='${DB}';" 2>/dev/null | tr -d ' ')
-  conns=${conns:-0}
+
+  if [[ -z "$conns" ]] && [[ -f production.env ]]; then
+    # Fall back to the application's own credentials. A non-superuser still sees every
+    # backend's row in pg_stat_activity, which is all a count needs.
+    url=$(grep -E '^DIRECT_DATABASE_URL=' production.env | head -1 | cut -d= -f2- | tr -d '"')
+    url=${url/host.docker.internal/127.0.0.1}
+    conns=$(psql "$url" -tAc \
+      "select count(*) from pg_stat_activity where datname='${DB}';" 2>/dev/null | tr -d ' ')
+  fi
+
+  conns=${conns:-unavailable}
 
   load1=$(awk '{print $1}' /proc/loadavg)
 
   [[ "$used_mb" -gt "$peak_used_mb" ]] && peak_used_mb=$used_mb
   [[ "$app_mb" -gt "$peak_app_mb" ]] && peak_app_mb=$app_mb
-  [[ "$conns" -gt "$peak_conns" ]] && peak_conns=$conns
+  if [[ "$conns" =~ ^[0-9]+$ ]] && [[ "$conns" -gt "$peak_conns" ]]; then peak_conns=$conns; fi
   samples=$((samples + 1))
 
   echo "$(date -Is),${used_mb},${app_mb},${conns},${load1}" >> "$LOG"
