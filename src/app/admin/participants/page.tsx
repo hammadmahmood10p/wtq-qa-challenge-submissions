@@ -63,7 +63,7 @@ export default async function ParticipantsPage({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <BulkImportDialog kind="participant" />
-          <BulkDeleteDialog kind="participant" query={query} />
+          <BulkDeleteDialog kind="participant" />
           <AddPersonDialog kind="participant" />
         </div>
       </div>

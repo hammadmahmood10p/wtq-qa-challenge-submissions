@@ -120,15 +120,34 @@ describe("evaluateProgress", () => {
     expect(progress.items.some((i) => i.key === "C3")).toBe(false);
   });
 
-  it("unlocks submission on Challenges 1 and 2 alone", () => {
-    // The gate the organisers asked for: the optional third challenge must not hold
-    // anybody hostage.
+  it("still refuses submission when no track has been chosen", () => {
+    // Challenges 1 and 2 finished is not enough. A participant who never opened the
+    // third would otherwise hand in two thirds of an attempt without ever making the
+    // one choice the event puts in front of them — and that choice is irreversible
+    // and carries a bonus, so it has to be made deliberately rather than by running
+    // out of time.
     const progress = evaluateProgress({
       track: null,
       completeEntryCount: 2,
       submissions: [completeC2()],
     });
 
+    expect(progress.trackChosen).toBe(false);
+    expect(progress.mandatoryComplete).toBe(false);
+    expect(progress.completed).toBe(2);
+  });
+
+  it("unlocks submission once the compulsory two are done and a track is chosen", () => {
+    // Chosen, not finished: committing to Challenge 3 or 4 is what the gate asks for.
+    // Insisting the third be complete as well would trap someone who ran out of time
+    // on it, and the clock already submits for them.
+    const progress = evaluateProgress({
+      track: "C4",
+      completeEntryCount: 2,
+      submissions: [completeC2()],
+    });
+
+    expect(progress.trackChosen).toBe(true);
     expect(progress.mandatoryComplete).toBe(true);
     expect(progress.completed).toBe(2);
   });

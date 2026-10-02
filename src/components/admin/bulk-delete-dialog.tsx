@@ -1,97 +1,137 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { AlertTriangle, Search, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
-  bulkDelete,
-  previewBulkDelete,
-  type DeletePreview,
+  deleteSelected,
+  listDeletable,
+  type DeletableRow,
 } from "@/app/actions/bulk-delete";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Field, Input } from "@/components/ui/field";
-import type { RosterQuery } from "@/lib/validation/admin";
+import { inputClasses } from "@/components/ui/field";
 
 /**
  * Bulk remove, for clearing test data.
  *
- * Deliberately awkward. It acts on the filter currently applied to the table rather
- * than on a selection, so what gets deleted is what the admin can see; it shows the
- * count and a sample of names before anything happens; and it will not proceed until
- * the count has been typed in by hand. Typing "412" is a poor confirmation of intent
- * in general, but it is an excellent one here, because the number is the thing most
- * likely to be wrong — an admin who means to clear last week's test batch and has left
- * a filter off will see 1,043 and stop.
+ * Deliberately a two-step dialog. The list is where the choice is made and can be
+ * changed freely; the confirmation does nothing but ask, and offers a way back that
+ * keeps the selection — because a confirmation you can only accept or abandon makes
+ * people accept it rather than lose five minutes of ticking.
+ *
+ * The whole roster loads at once rather than a page at a time. A cleanup tool that
+ * showed you twenty-five rows would have you deleting in twenty-five-row instalments,
+ * and the account you cannot see is the one left behind. A thousand rows of this markup
+ * is unremarkable for a browser; the search box is there for finding, not for paging.
  */
 
 const NOUN = {
-  participant: { one: "participant", many: "participants" },
-  judge: { one: "judge", many: "judges" },
+  participant: { one: "Participant", many: "Participants" },
+  judge: { one: "Judge", many: "Judges" },
 } as const;
 
-type Stage =
-  | { name: "closed" }
-  | { name: "loading" }
-  | { name: "confirm"; preview: DeletePreview }
-  | { name: "done"; deleted: number; filesRemoved: number };
+type Stage = "closed" | "loading" | "select" | "confirm" | "done";
 
-export function BulkDeleteDialog({
-  kind,
-  query,
-}: {
-  kind: "participant" | "judge";
-  query: RosterQuery;
-}) {
+export function BulkDeleteDialog({ kind }: { kind: "participant" | "judge" }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [stage, setStage] = useState<Stage>({ name: "closed" });
-  const [typed, setTyped] = useState("");
+
+  const [stage, setStage] = useState<Stage>("closed");
+  const [rows, setRows] = useState<DeletableRow[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ deleted: number; filesRemoved: number } | null>(null);
 
   const noun = NOUN[kind];
 
   function open() {
     setError(null);
-    setTyped("");
-    setStage({ name: "loading" });
+    setSearch("");
+    setSelected(new Set());
+    setStage("loading");
 
     startTransition(async () => {
-      const preview = await previewBulkDelete(kind, query);
-      setStage({ name: "confirm", preview });
+      try {
+        setRows(await listDeletable(kind));
+        setStage("select");
+      } catch {
+        setError("Could not load the list. Please try again.");
+        setStage("select");
+      }
     });
   }
 
   function close() {
-    setStage({ name: "closed" });
-    setTyped("");
+    setStage("closed");
+    setRows([]);
+    setSelected(new Set());
+    setSearch("");
     setError(null);
+    setResult(null);
   }
 
-  function confirm(preview: DeletePreview) {
+  const visible = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    if (!needle) return rows;
+    return rows.filter(
+      (row) =>
+        row.fullName.toLowerCase().includes(needle) || row.email.toLowerCase().includes(needle),
+    );
+  }, [rows, search]);
+
+  const chosen = useMemo(() => rows.filter((row) => selected.has(row.id)), [rows, selected]);
+  const chosenWithWork = chosen.filter((row) => row.hasWork).length;
+
+  // "Select all" acts on what is on screen, not on the whole roster. Searching for
+  // "test" and ticking the header box should select the test accounts — selecting a
+  // thousand others invisibly would be a trap.
+  const allVisibleSelected = visible.length > 0 && visible.every((row) => selected.has(row.id));
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllVisible() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) for (const row of visible) next.delete(row.id);
+      else for (const row of visible) next.add(row.id);
+      return next;
+    });
+  }
+
+  function confirm() {
     setError(null);
 
     startTransition(async () => {
-      const result = await bulkDelete(kind, query, preview.total);
+      const outcome = await deleteSelected(kind, [...selected]);
 
-      if (result.error) {
-        setError(result.error);
-        // The count moved under us, so the typed confirmation no longer means
-        // anything. Take it back and make them look again.
-        const fresh = await previewBulkDelete(kind, query);
-        setStage({ name: "confirm", preview: fresh });
-        setTyped("");
+      if (outcome.error) {
+        setError(outcome.error);
+        setStage("select");
         return;
       }
 
-      setStage({ name: "done", deleted: result.deleted, filesRemoved: result.filesRemoved });
+      setResult({ deleted: outcome.deleted, filesRemoved: outcome.filesRemoved });
+      setStage("done");
       router.refresh();
     });
   }
 
-  const preview = stage.name === "confirm" ? stage.preview : null;
-  const matches = preview ? typed.trim() === String(preview.total) : false;
+  const title =
+    stage === "done"
+      ? `${noun.many} deleted`
+      : stage === "confirm"
+        ? `Delete ${chosen.length} ${chosen.length === 1 ? noun.one.toLowerCase() : noun.many.toLowerCase()}?`
+        : `Remove ${noun.many.toLowerCase()}`;
 
   return (
     <>
@@ -99,7 +139,7 @@ export function BulkDeleteDialog({
         variant="ghost"
         size="sm"
         onClick={open}
-        disabled={pending}
+        disabled={pending && stage === "closed"}
         className="hover:text-danger-strong"
       >
         <Trash2 size={14} />
@@ -107,22 +147,170 @@ export function BulkDeleteDialog({
       </Button>
 
       <Dialog
-        open={stage.name !== "closed"}
-        onClose={close}
-        title={stage.name === "done" ? "Accounts deleted" : `Delete ${noun.many}?`}
+        open={stage !== "closed"}
+        onClose={() => !pending && close()}
+        title={title}
+        className="max-w-3xl"
       >
-        {stage.name === "loading" && (
-          <p className="text-muted text-sm">Counting what this filter matches…</p>
+        {stage === "loading" && (
+          <p className="text-muted text-sm">Loading {noun.many.toLowerCase()}…</p>
         )}
 
-        {stage.name === "done" && (
+        {stage === "select" && (
+          <div className="space-y-4">
+            {error && <Alert variant="error">{error}</Alert>}
+
+            <div className="relative">
+              <Search
+                size={15}
+                className="text-muted pointer-events-none absolute top-1/2 left-3 -translate-y-1/2"
+              />
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={`Search ${noun.many.toLowerCase()} by name or email…`}
+                aria-label={`Search ${noun.many.toLowerCase()}`}
+                className={`${inputClasses()} pl-9`}
+              />
+            </div>
+
+            <div className="border-border overflow-hidden rounded-(--radius-card) border">
+              <label className="border-border bg-surface-raised flex cursor-pointer items-center gap-3 border-b px-4 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  onChange={toggleAllVisible}
+                  disabled={visible.length === 0}
+                  className="size-4 shrink-0 accent-[var(--violet)]"
+                />
+                <span className="text-sm font-medium">
+                  {search.trim() ? `Select all ${visible.length} shown` : "Select all"}
+                </span>
+                <span className="text-muted ml-auto text-xs tabular-nums">
+                  {selected.size} of {rows.length} selected
+                </span>
+              </label>
+
+              <div className="max-h-[22rem] overflow-y-auto">
+                {visible.length === 0 ? (
+                  <p className="text-muted px-4 py-8 text-center text-sm">
+                    No {noun.many.toLowerCase()} match that search.
+                  </p>
+                ) : (
+                  <ul>
+                    {visible.map((row) => (
+                      <li key={row.id} className="border-border border-b last:border-b-0">
+                        <label className="hover:bg-surface-raised flex cursor-pointer items-center gap-3 px-4 py-2.5">
+                          <input
+                            type="checkbox"
+                            checked={selected.has(row.id)}
+                            onChange={() => toggle(row.id)}
+                            className="size-4 shrink-0 accent-[var(--violet)]"
+                          />
+
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium">
+                              {row.fullName}
+                            </span>
+                            <span className="text-muted block truncate text-xs">{row.email}</span>
+                          </span>
+
+                          {/* Said against the row, not totalled in the next dialog:
+                              the consequence belongs where the decision is made. */}
+                          {row.hasWork && (
+                            <span className="border-warning/40 bg-warning/10 text-warning-strong shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium">
+                              {kind === "participant" ? "has submitted" : "holds reviews"}
+                            </span>
+                          )}
+
+                          <span className="text-muted shrink-0 text-[11px]">{row.status}</span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="secondary" onClick={close} disabled={pending}>
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => setStage("confirm")}
+                disabled={selected.size === 0 || pending}
+              >
+                <Trash2 size={14} />
+                Delete {selected.size}{" "}
+                {selected.size === 1 ? noun.one : noun.many}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {stage === "confirm" && (
+          <div className="space-y-4">
+            {error && <Alert variant="error">{error}</Alert>}
+
+            <Alert variant="warning" title="This cannot be undone">
+              <strong>{chosen.length}</strong>{" "}
+              {chosen.length === 1 ? noun.one.toLowerCase() : noun.many.toLowerCase()} will be
+              permanently deleted, together with their accounts, saved work and uploaded
+              files. This is not the same as Remove on a single row, which keeps the
+              record.
+            </Alert>
+
+            {chosenWithWork > 0 && (
+              <Alert variant="error" title="Submitted work will be destroyed">
+                {chosenWithWork} of them{" "}
+                {kind === "participant"
+                  ? "have already submitted or run out of time. Their answers and uploads go too, and judges will no longer see them."
+                  : "are holding reviews. Those reviews are deleted and the submissions go back to unclaimed."}
+              </Alert>
+            )}
+
+            <div>
+              <p className="text-muted text-xs font-medium tracking-wide uppercase">
+                About to be deleted
+              </p>
+              <div className="border-border mt-2 max-h-[14rem] overflow-y-auto rounded-(--radius-control) border">
+                <ul className="divide-border divide-y">
+                  {chosen.map((row) => (
+                    <li key={row.id} className="flex items-center gap-2 px-3 py-2 text-sm">
+                      <AlertTriangle size={13} className="text-danger-strong shrink-0" />
+                      <span className="truncate">{row.fullName}</span>
+                      <span className="text-muted ml-auto shrink-0 truncate font-mono text-[11px]">
+                        {row.email}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2">
+              {/* Back, not cancel. The selection survives, because losing it is what
+                  makes someone click Confirm on a list they are no longer sure of. */}
+              <Button variant="secondary" onClick={() => setStage("select")} disabled={pending}>
+                Back to selection
+              </Button>
+              <Button variant="danger" onClick={confirm} loading={pending}>
+                Confirm
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {stage === "done" && result && (
           <div className="space-y-4">
             <Alert variant="success">
-              {stage.deleted.toLocaleString()} {stage.deleted === 1 ? noun.one : noun.many}{" "}
-              deleted
-              {stage.filesRemoved > 0 &&
-                `, along with ${stage.filesRemoved.toLocaleString()} uploaded ${
-                  stage.filesRemoved === 1 ? "file" : "files"
+              {result.deleted.toLocaleString()}{" "}
+              {result.deleted === 1 ? noun.one.toLowerCase() : noun.many.toLowerCase()} deleted
+              {result.filesRemoved > 0 &&
+                `, along with ${result.filesRemoved.toLocaleString()} uploaded ${
+                  result.filesRemoved === 1 ? "file" : "files"
                 }`}
               .
             </Alert>
@@ -131,98 +319,6 @@ export function BulkDeleteDialog({
                 Close
               </Button>
             </div>
-          </div>
-        )}
-
-        {preview && (
-          <div className="space-y-4">
-            {preview.total === 0 ? (
-              <>
-                <p className="text-muted text-sm">
-                  No {noun.many} match the filters on the table right now, so there is
-                  nothing to delete.
-                </p>
-                <div className="flex justify-end">
-                  <Button variant="secondary" onClick={close}>
-                    Close
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <Alert variant="warning" title="This cannot be undone">
-                  <strong>{preview.total.toLocaleString()}</strong>{" "}
-                  {preview.total === 1 ? noun.one : noun.many} matching the filters on
-                  this table will be permanently deleted, together with their accounts,
-                  saved work and uploaded files. This is not the same as Remove on a
-                  single row, which keeps the record.
-                </Alert>
-
-                {preview.withWork > 0 && (
-                  <Alert variant="error" title="Submitted work will be destroyed">
-                    {preview.withWork.toLocaleString()} of them{" "}
-                    {kind === "participant"
-                      ? "have already submitted or run out of time. Their answers and uploads go too, and judges will no longer see them."
-                      : "are holding reviews. Those reviews are deleted and the submissions go back to unclaimed."}
-                  </Alert>
-                )}
-
-                <div>
-                  <p className="text-muted text-xs font-medium tracking-wide uppercase">
-                    Including
-                  </p>
-                  <ul className="text-muted mt-2 space-y-1 text-sm">
-                    {preview.sample.map((person) => (
-                      <li key={person.email} className="truncate">
-                        {person.fullName}{" "}
-                        <span className="text-muted/70 font-mono text-xs">
-                          {person.email}
-                        </span>
-                      </li>
-                    ))}
-                    {preview.total > preview.sample.length && (
-                      <li className="text-muted/70">
-                        and {(preview.total - preview.sample.length).toLocaleString()} more
-                      </li>
-                    )}
-                  </ul>
-                </div>
-
-                <Field
-                  label={`Type ${preview.total} to confirm`}
-                  hint="The number of accounts about to be deleted."
-                >
-                  {({ id, describedBy }) => (
-                    <Input
-                      id={id}
-                      aria-describedby={describedBy}
-                      value={typed}
-                      onChange={(event) => setTyped(event.target.value)}
-                      inputMode="numeric"
-                      autoComplete="off"
-                      placeholder={String(preview.total)}
-                    />
-                  )}
-                </Field>
-
-                {error && <Alert variant="error">{error}</Alert>}
-
-                <div className="flex justify-end gap-2">
-                  <Button variant="secondary" onClick={close} disabled={pending}>
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="danger"
-                    onClick={() => confirm(preview)}
-                    disabled={!matches || pending}
-                    loading={pending}
-                  >
-                    Delete {preview.total.toLocaleString()}{" "}
-                    {preview.total === 1 ? noun.one : noun.many}
-                  </Button>
-                </div>
-              </>
-            )}
           </div>
         )}
       </Dialog>

@@ -68,7 +68,18 @@ services:
       - "host.docker.internal:host-gateway"
 
   nginx:
-    image: nginx:1.27-alpine
+    # Pinned to an exact patch on nginx's *stable* branch — even minor numbers are
+    # stable, odd ones are mainline, so 1.30.x is the line to track and 1.31.x is not.
+    #
+    # Moved off 1.27 after IT's assessment of 1 Oct 2026 raised five High findings,
+    # every one of them "nginx older than X". The floor across them was 1.30.4.
+    #
+    # Exact rather than floating `1.30-alpine`: a tag that silently changes under you
+    # is the wrong trade nine days before a one-shot event, where knowing precisely
+    # what is deployed matters more than picking up a patch unattended. That makes
+    # re-checking for newer patches a dated task rather than an automatic one —
+    # see docs/DEPLOYMENT_RUNBOOK.md.
+    image: nginx:1.30.5-alpine
     restart: unless-stopped
     depends_on:
       - app

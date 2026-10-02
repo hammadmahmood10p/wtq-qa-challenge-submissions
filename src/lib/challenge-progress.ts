@@ -57,6 +57,16 @@ export interface Progress {
   total: number;
   /** Challenges 1 and 2, which the organisers made compulsory. */
   mandatory: ChallengeStatus[];
+  /**
+   * Whether they have committed to Challenge 3 or Challenge 4.
+   *
+   * A separate requirement from finishing it. Submitting without having chosen leaves
+   * a third of the marks unattempted and the choice — which is irreversible and
+   * carries a bonus — never made at all, so the gate asks for the decision even though
+   * it does not insist the work be finished.
+   */
+  trackChosen: boolean;
+  /** Everything that must be true before Submit will work. */
   mandatoryComplete: boolean;
 }
 
@@ -132,12 +142,18 @@ export function evaluateProgress(input: ProgressInput): Progress {
   }
 
   const mandatory = items.filter((item) => item.key === "C1" || item.key === "C2");
+  const trackChosen = input.track !== null;
 
   return {
     items,
     completed: items.filter((item) => item.complete).length,
     total: TOTAL_CHALLENGES,
     mandatory,
-    mandatoryComplete: mandatory.every((item) => item.complete),
+    trackChosen,
+    // Finishing the compulsory two is not enough on its own. A participant who did
+    // Challenges 1 and 2 and never opened the third would otherwise find Submit live
+    // and hand in two thirds of an attempt without ever being asked to make the one
+    // choice the event puts in front of them.
+    mandatoryComplete: mandatory.every((item) => item.complete) && trackChosen,
   };
 }

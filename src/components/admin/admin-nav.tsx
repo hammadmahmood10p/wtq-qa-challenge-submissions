@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardList, Gavel, LayoutDashboard, ShieldCheck, Users } from "lucide-react";
+import { ClipboardList, Gavel, LayoutDashboard, ScrollText, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ const LINKS = [
   { href: "/admin/judges", label: "Judges", icon: Gavel },
   { href: "/admin/submissions", label: "Submissions", icon: ClipboardList },
   { href: "/admin/admins", label: "Super Admins", icon: ShieldCheck },
+  { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
 ];
 
 export function AdminNav({ pendingJudges }: { pendingJudges: number }) {

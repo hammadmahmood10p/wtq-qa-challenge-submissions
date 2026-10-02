@@ -188,29 +188,37 @@ export default async function ReviewPage({
         </div>
       </header>
 
-      {/* Unassigned: a judge can take it from here rather than going back to the
-          list. A super admin is shown the state but not offered the claim — judging is
-          not their job, and they can set any name from the table if they need to. */}
-      {!evaluation && user.role === "JUDGE" && (
-        <ClaimBar attemptId={submission.id} judgeId={user.id} judgeName={user.fullName} />
+      {/*
+        Unclaimed: a judge can take it from here rather than going back to the list.
+
+        The condition is the *judge*, not the row. Since a super admin can release a
+        submission or reopen a finalised one, an evaluation full of scores with nobody
+        against it is now an ordinary state — and it is exactly the state where the
+        claim offer belongs.
+
+        A super admin is shown the state but never offered the claim: judging is not
+        their job, and they can no longer put somebody else's name on anyway.
+      */}
+      {!evaluation?.judgeId && user.role === "JUDGE" && (
+        <ClaimBar attemptId={submission.id} judgeName={user.fullName} />
       )}
 
-      {!evaluation && user.role === "SUPER_ADMIN" && (
+      {!evaluation?.judgeId && user.role === "SUPER_ADMIN" && (
         <Alert variant="info" title="No judge has taken this yet">
-          Judges pick submissions up from the shared table. You can put a name against
-          this one from Participants Submission Details.
+          Judges pick submissions up from the shared table themselves. You can reopen or
+          unassign one from Participants Submission Details, but not assign it.
         </Alert>
       )}
 
-      {evaluation && !assignedToMe && user.role === "JUDGE" && (
-        <Alert variant="info" title={`${evaluation.judge.fullName} is reviewing this`}>
+      {evaluation?.judge && !assignedToMe && user.role === "JUDGE" && (
+        <Alert variant="info" title={` is reviewing this`}>
           You can read this submission, but only the judge who took it can score it.
         </Alert>
       )}
 
       <ReviewTabs panels={panels} />
 
-      {evaluation && <FinalScoreBar judgeName={evaluation.judge.fullName} />}
+      {evaluation && <FinalScoreBar judgeName={evaluation.judge?.fullName ?? "Unassigned"} />}
       </div>
     </ScoringProvider>
   );

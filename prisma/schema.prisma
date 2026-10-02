@@ -326,8 +326,19 @@ model Evaluation {
   attemptId String  @unique @db.Uuid
   attempt   Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
 
-  judgeId String @db.Uuid
-  judge   User   @relation("EvaluationJudge", fields: [judgeId], references: [id])
+  /// Null means nobody currently holds this submission.
+  ///
+  /// Nullable so that a submission can be put back into the shared pool *without
+  /// throwing the scoring away*. A super admin taking a submission off a judge who has
+  /// gone home, and reopening a finalised score for a second look, are both "unclaim
+  /// it, keep the work" — and with a required judge the only way to express that was
+  /// to delete the row, which cascades the scores with it.
+  ///
+  /// So "has a row" now means "has been looked at", and "has a judgeId" means
+  /// "somebody holds it right now". They are different questions and used to be the
+  /// same answer.
+  judgeId String? @db.Uuid
+  judge   User?   @relation("EvaluationJudge", fields: [judgeId], references: [id])
 
   assignedAt DateTime  @default(now())
   // Soft claim: refreshed while a judge has the review page open. Expires on inactivity.
