@@ -569,13 +569,23 @@ export async function adminCreateSuperAdmin(
  * sequence is the whole reason Challenge 1 locks, and undoing it silently would be the
  * worst kind of helpful.
  */
-export async function adminUnlockChallenge1(participantId: string): Promise<AdminState> {
+export async function adminUnlockChallenge1(
+  participantId: string,
+  /**
+   * Minutes to put back on the clock. Needed only when the attempt has already been
+   * handed in — then this also lets the participant sign in again, and an account
+   * reopened onto an expired clock could log in and do nothing.
+   */
+  minutes?: number,
+): Promise<AdminState> {
   const admin = await requireRole("SUPER_ADMIN");
 
-  const result = await unlockChallenge1(participantId, admin.id);
+  const result = await unlockChallenge1(participantId, admin.id, { minutes });
   if (!result.ok) return { message: result.message };
 
   revalidatePath("/admin/participants");
+  revalidatePath("/admin/submissions");
+  revalidatePath("/judge");
 
   return { ok: true, message: "Challenge 1 is open again for this participant." };
 }

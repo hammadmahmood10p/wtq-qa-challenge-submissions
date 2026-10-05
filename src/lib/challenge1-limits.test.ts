@@ -109,3 +109,28 @@ describe("isChallengeReachable", () => {
     expect(isChallengeReachable("C1", true)).toBe(true);
   });
 });
+
+describe("isChallengeReachable — reopened for Challenge 1 only", () => {
+  it("keeps Challenge 1 open, which is the whole point of the grant", () => {
+    expect(isChallengeReachable("C1", true, true)).toBe(true);
+  });
+
+  it("shuts the other three even though Challenge 1 has been locked before", () => {
+    // The opposite situation to the start of an attempt, with the same appearance:
+    // not "you have not got there yet" but "you already handed those in".
+    for (const id of ["C2", "C3", "C4"]) {
+      expect(isChallengeReachable(id, true, true)).toBe(false);
+    }
+  });
+
+  it("leaves the normal sequence alone when the flag is not set", () => {
+    expect(isChallengeReachable("C2", true, false)).toBe(true);
+    expect(isChallengeReachable("C2", false, false)).toBe(false);
+  });
+
+  it("defaults to the normal sequence when the flag is not passed at all", () => {
+    // Every existing caller relies on this, so it is worth pinning down.
+    expect(isChallengeReachable("C2", true)).toBe(true);
+    expect(isChallengeReachable("C2", false)).toBe(false);
+  });
+});

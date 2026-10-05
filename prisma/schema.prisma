@@ -229,6 +229,16 @@ model Attempt {
   /// for a correction must not also hide the work the participant has already done on
   /// Challenges 2 to 4.
   challenge1LockCount Int @default(0)
+
+  /// Set when a super admin reopened a *submitted* attempt for Challenge 1 alone.
+  ///
+  /// A normal reopen hands the whole attempt back. This one does not: Challenges 2 to
+  /// 4 were submitted and stay submitted, and only Challenge 1 is editable again. The
+  /// two need telling apart because they grant different things, and the account is
+  /// unlocked for both — so the account status cannot carry the distinction.
+  ///
+  /// Cleared when they submit again, which re-seals Challenge 1.
+  reopenedForChallenge1 Boolean @default(false)
   /// Incremented when the attempt is wiped for a fresh run. The work itself is gone.
   resetCount  Int       @default(0)
 

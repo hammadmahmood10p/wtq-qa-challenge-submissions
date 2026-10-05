@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import type { ChallengeKey } from "@/generated/prisma/enums";
 import { Challenge1ReadOnly } from "@/components/challenge/challenge1-readonly";
+import { Challenge1Criteria } from "@/components/review/challenge1-criteria";
 import {
   Challenge2ReadOnly,
   Challenge3ReadOnly,
@@ -19,7 +20,6 @@ import { Alert } from "@/components/ui/alert";
 import { requireRole } from "@/lib/auth";
 import { CHALLENGES, challengeById } from "@/lib/challenge-content";
 import { getSubmissionDetail } from "@/lib/submissions";
-
 
 export const metadata: Metadata = { title: "Review submission — WTQ 2026" };
 
@@ -39,11 +39,7 @@ const LOCATION_LABELS: Record<string, string> = {
  * The score fields and the Submit Final Score button arrive next; the total banner is
  * here because the brief puts it at the top, and it reads as zero until scoring begins.
  */
-export default async function ReviewPage({
-  params,
-}: {
-  params: Promise<{ attemptId: string }>;
-}) {
+export default async function ReviewPage({ params }: { params: Promise<{ attemptId: string }> }) {
   const user = await requireRole("JUDGE", "SUPER_ADMIN");
   const { attemptId } = await params;
 
@@ -61,7 +57,6 @@ export default async function ReviewPage({
 
   const initialScores: Record<string, number> = {};
   for (const row of evaluation?.scores ?? []) initialScores[row.criterion] = Number(row.score);
-
 
   const byChallenge = new Map(submission.submissions.map((s) => [s.challenge, s]));
 
@@ -92,7 +87,12 @@ export default async function ReviewPage({
     let content: React.ReactNode = null;
 
     if (challenge.id === "C1") {
-      content = <Challenge1ReadOnly entries={submission.challenge1Entries} />;
+      content = (
+        <div className="space-y-6">
+          <Challenge1Criteria />
+          <Challenge1ReadOnly entries={submission.challenge1Entries} />
+        </div>
+      );
     } else if (challenge.id === "C4") {
       const row = byChallenge.get("C4");
       content = (
@@ -147,48 +147,52 @@ export default async function ReviewPage({
       canScore={canScore}
       canUnlock={user.role === "SUPER_ADMIN"}
       initialScores={initialScores}
-      initialBonus={evaluation?.bonusPoints === null || evaluation?.bonusPoints === undefined ? null : Number(evaluation.bonusPoints)}
+      initialBonus={
+        evaluation?.bonusPoints === null || evaluation?.bonusPoints === undefined
+          ? null
+          : Number(evaluation.bonusPoints)
+      }
     >
       <div className="space-y-6">
-      <Link
-        href={backHref}
-        className="text-muted hover:text-text inline-flex items-center gap-1.5 text-sm transition-colors"
-      >
-        <ArrowLeft size={14} />
-        Back to submissions
-      </Link>
+        <Link
+          href={backHref}
+          className="text-muted hover:text-text inline-flex items-center gap-1.5 text-sm transition-colors"
+        >
+          <ArrowLeft size={14} />
+          Back to submissions
+        </Link>
 
-      <header className="border-border bg-surface shadow-(--shadow-card) rounded-(--radius-card) border p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="font-display text-2xl font-bold">
-              {submission.participant.user.fullName}
-            </h1>
-            <p className="text-muted mt-1.5 font-mono text-xs">
-              {submission.idCardNumber} · {LOCATION_LABELS[submission.participant.location]}
-            </p>
-            <p className="text-muted mt-1 text-xs">
-              {submission.submittedAt
-                ? `Submitted ${submission.submittedAt.toLocaleString("en-GB", {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  })}`
-                : "Not submitted"}
-              {submission.autoSubmitted && " · submitted automatically when time ran out"}
-            </p>
-            <p className="text-muted mt-2 text-xs">
-              {chosen
-                ? `Chose Challenge ${chosen.number} — ${chosen.title}`
-                : "Did not choose between Challenge 3 and Challenge 4"}
-            </p>
+        <header className="border-border bg-surface shadow-(--shadow-card) rounded-(--radius-card) border p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="font-display text-2xl font-bold">
+                {submission.participant.user.fullName}
+              </h1>
+              <p className="text-muted mt-1.5 font-mono text-xs">
+                {submission.idCardNumber} · {LOCATION_LABELS[submission.participant.location]}
+              </p>
+              <p className="text-muted mt-1 text-xs">
+                {submission.submittedAt
+                  ? `Submitted ${submission.submittedAt.toLocaleString("en-GB", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}`
+                  : "Not submitted"}
+                {submission.autoSubmitted && " · submitted automatically when time ran out"}
+              </p>
+              <p className="text-muted mt-2 text-xs">
+                {chosen
+                  ? `Chose Challenge ${chosen.number} — ${chosen.title}`
+                  : "Did not choose between Challenge 3 and Challenge 4"}
+              </p>
+            </div>
+
+            {/* Requirement 5 for judges: the total sits at the top and starts at zero. */}
+            <TotalBanner />
           </div>
+        </header>
 
-          {/* Requirement 5 for judges: the total sits at the top and starts at zero. */}
-          <TotalBanner />
-        </div>
-      </header>
-
-      {/*
+        {/*
         Unclaimed: a judge can take it from here rather than going back to the list.
 
         The condition is the *judge*, not the row. Since a super admin can release a
@@ -199,26 +203,26 @@ export default async function ReviewPage({
         A super admin is shown the state but never offered the claim: judging is not
         their job, and they can no longer put somebody else's name on anyway.
       */}
-      {!evaluation?.judgeId && user.role === "JUDGE" && (
-        <ClaimBar attemptId={submission.id} judgeName={user.fullName} />
-      )}
+        {!evaluation?.judgeId && user.role === "JUDGE" && (
+          <ClaimBar attemptId={submission.id} judgeName={user.fullName} />
+        )}
 
-      {!evaluation?.judgeId && user.role === "SUPER_ADMIN" && (
-        <Alert variant="info" title="No judge has taken this yet">
-          Judges pick submissions up from the shared table themselves. You can reopen or
-          unassign one from Participants Submission Details, but not assign it.
-        </Alert>
-      )}
+        {!evaluation?.judgeId && user.role === "SUPER_ADMIN" && (
+          <Alert variant="info" title="No judge has taken this yet">
+            Judges pick submissions up from the shared table themselves. You can reopen or unassign
+            one from Participants Submission Details, but not assign it.
+          </Alert>
+        )}
 
-      {evaluation?.judge && !assignedToMe && user.role === "JUDGE" && (
-        <Alert variant="info" title={` is reviewing this`}>
-          You can read this submission, but only the judge who took it can score it.
-        </Alert>
-      )}
+        {evaluation?.judge && !assignedToMe && user.role === "JUDGE" && (
+          <Alert variant="info" title={` is reviewing this`}>
+            You can read this submission, but only the judge who took it can score it.
+          </Alert>
+        )}
 
-      <ReviewTabs panels={panels} />
+        <ReviewTabs panels={panels} />
 
-      {evaluation && <FinalScoreBar judgeName={evaluation.judge?.fullName ?? "Unassigned"} />}
+        {evaluation && <FinalScoreBar judgeName={evaluation.judge?.fullName ?? "Unassigned"} />}
       </div>
     </ScoringProvider>
   );

@@ -36,6 +36,14 @@ export interface AttemptView {
    * would hide work the participant has already done on them.
    */
   challenge1EverLocked: boolean;
+
+  /**
+   * Set while a super admin has reopened a *submitted* attempt for Challenge 1 alone.
+   *
+   * Challenges 2 to 4 were handed in and stay handed in. Cleared when they submit
+   * again, which re-seals Challenge 1.
+   */
+  reopenedForChallenge1: boolean;
   /** Server time at the moment this was read, so the client can correct its own clock. */
   serverNow: Date;
   remainingMs: number;
@@ -135,6 +143,7 @@ export const getAttempt = cache(async (participantId: string): Promise<AttemptVi
     chosenTrack: attempt.chosenTrack,
     challenge1LockedAt: attempt.challenge1LockedAt,
     challenge1EverLocked: attempt.challenge1LockCount > 0,
+    reopenedForChallenge1: attempt.reopenedForChallenge1,
     serverNow,
     remainingMs: attempt.endsAt ? Math.max(0, attempt.endsAt.getTime() - serverNow.getTime()) : 0,
   };

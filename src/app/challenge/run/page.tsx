@@ -41,6 +41,7 @@ export default async function ChallengeRunPage() {
         <ChallengeTabs
           chosenTrack={attempt.chosenTrack}
           challenge1Locked={attempt.challenge1EverLocked}
+          reopenedForChallenge1={attempt.reopenedForChallenge1}
         />
       </main>
     </>

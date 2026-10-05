@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 export function ChallengeTabs({
   chosenTrack,
   challenge1Locked,
+  reopenedForChallenge1 = false,
 }: {
   chosenTrack: ChallengeTrack | null;
   /**
@@ -36,10 +37,18 @@ export function ChallengeTabs({
    * reports after seeing what the AI found.
    */
   challenge1Locked: boolean;
+  /**
+   * Set while a super admin has reopened a submitted attempt for Challenge 1 alone.
+   *
+   * Shuts Challenges 2 to 4 for the opposite reason to the one above: not "you have not
+   * got there yet" but "you already handed those in".
+   */
+  reopenedForChallenge1?: boolean;
 }) {
   const [active, setActive] = useState(0);
 
-  const reachable = (index: number) => isChallengeReachable(CHALLENGES[index].id, challenge1Locked);
+  const reachable = (index: number) =>
+    isChallengeReachable(CHALLENGES[index].id, challenge1Locked, reopenedForChallenge1);
 
   /**
    * The tab actually shown.
@@ -111,7 +120,13 @@ export function ChallengeTabs({
                 aria-controls={`panel-${challenge.id}`}
                 disabled={waitingOnChallenge1}
                 tabIndex={selected ? 0 : -1}
-                title={waitingOnChallenge1 ? "Lock Challenge 1 to open this one" : undefined}
+                title={
+                  waitingOnChallenge1
+                    ? reopenedForChallenge1
+                      ? "Already submitted — only Challenge 1 was reopened for you"
+                      : "Lock Challenge 1 to open this one"
+                    : undefined
+                }
                 onClick={() => setActive(index)}
                 className={cn(
                   "relative shrink-0 px-4 py-3 text-left transition-colors lg:rounded-(--radius-control) lg:border",
@@ -160,14 +175,26 @@ export function ChallengeTabs({
         {/* Said once, at the top, rather than on each shut tab: a participant who has
             not locked yet is looking at three greyed-out challenges and needs one
             explanation, not three. */}
-        {!challenge1Locked && (
-          <Alert variant="info" title="Start with Challenge 1" className="mt-6 lg:mt-0">
-            Challenges 2, 3 and 4 open once you have locked Challenge 1. Do your manual testing
-            first — that is the point of the order.
+        {reopenedForChallenge1 ? (
+          <Alert
+            variant="warning"
+            title="Challenge 1 has been reopened for you"
+            className="mt-6 lg:mt-0"
+          >
+            Everything you wrote is still there. Challenges 2, 3 and 4 were already submitted and
+            cannot be changed — only Challenge 1 is editable. When you are finished, press Submit
+            again; your new Challenge 1 replaces the old one and nothing is submitted twice.
           </Alert>
+        ) : (
+          !challenge1Locked && (
+            <Alert variant="info" title="Start with Challenge 1" className="mt-6 lg:mt-0">
+              Challenges 2, 3 and 4 open once you have locked Challenge 1. Do your manual testing
+              first — that is the point of the order.
+            </Alert>
+          )
         )}
 
-        {challenge1Locked && !chosenTrack && (
+        {challenge1Locked && !chosenTrack && !reopenedForChallenge1 && (
           <Alert
             variant="info"
             title="Challenges 3 and 4 are alternatives"

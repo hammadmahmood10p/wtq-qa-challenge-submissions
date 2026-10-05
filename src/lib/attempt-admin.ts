@@ -75,6 +75,10 @@ export async function reopenAttempt(
         autoSubmitted: false,
         reopenedAt: now,
         reopenCount: { increment: 1 },
+        // A full reopen hands back everything, so it is never the Challenge-1-only
+        // grant. Stated rather than assumed: the two are set from different screens
+        // and must not be able to overlap.
+        reopenedForChallenge1: false,
       },
     });
 
@@ -196,6 +200,7 @@ export async function resetAttempt(
         // `reopenAttempt` deliberately does the opposite and leaves them alone.
         challenge1LockedAt: null,
         challenge1LockCount: 0,
+        reopenedForChallenge1: false,
       },
     });
 

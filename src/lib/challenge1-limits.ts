@@ -65,15 +65,28 @@ export function canSealChallenge1(entries: Challenge1EntryFields[]): boolean {
 }
 
 /**
- * Whether a challenge other than the first is reachable yet.
+ * Whether a challenge other than the first is reachable.
  *
- * The organisers want the manual testing done before the AI challenges are visible, so
- * Challenge 1 is the only one open at the start. The gate reads `everLocked`, not "is
- * locked now": a participant whose Challenge 1 a super admin reopened keeps Challenges
- * 2 to 4 — they are being allowed to correct something, not sent back to the start.
+ * Two different rules close Challenges 2 to 4, at opposite ends of an attempt.
+ *
+ * **Before:** the organisers want the manual testing done before the AI challenges are
+ * visible, so Challenge 1 is the only one open at the start. That gate reads
+ * `everLocked`, not "is locked now" — a participant whose Challenge 1 a super admin
+ * reopened mid-attempt keeps Challenges 2 to 4, because they are being allowed to
+ * correct something, not sent back to the start.
+ *
+ * **After:** a super admin can reopen Challenge 1 on an attempt that was already
+ * handed in. Then only Challenge 1 is editable, and the other three are closed because
+ * they have been submitted — the opposite situation, the same appearance.
  */
-export function isChallengeReachable(challengeId: string, everLockedChallenge1: boolean): boolean {
-  return challengeId === "C1" || everLockedChallenge1;
+export function isChallengeReachable(
+  challengeId: string,
+  everLockedChallenge1: boolean,
+  reopenedForChallenge1 = false,
+): boolean {
+  if (challengeId === "C1") return true;
+  if (reopenedForChallenge1) return false;
+  return everLockedChallenge1;
 }
 
 /** Which of the four are still blank, in reading order, for telling someone why. */
