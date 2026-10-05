@@ -4,6 +4,7 @@ import { ImagePlus, Loader2, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { addAttachment, removeAttachment } from "@/app/actions/challenge1";
 import { MAX_IMAGES_PER_FIELD } from "@/lib/image";
+import { cn } from "@/lib/utils";
 
 export interface Evidence {
   id: string;
@@ -37,6 +38,7 @@ export function EvidenceStrip({
   disabled?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function upload(file: File) {
@@ -71,19 +73,49 @@ export function EvidenceStrip({
     if (!result.ok) onError(result.error ?? "Could not remove that image.");
   }
 
+  const full = items.length >= MAX_IMAGES_PER_FIELD;
+
+  /**
+   * Dropping a file onto the strip.
+   *
+   * Added when pasting was turned off in Challenge 1. Pasting a screenshot straight
+   * into the description used to be the quickest route and is now blocked along with
+   * every other paste, so without this the only way left would be the file picker —
+   * which is several clicks after every screenshot, forty times over.
+   */
+  function onDrop(event: React.DragEvent) {
+    event.preventDefault();
+    setDragging(false);
+    if (disabled || busy || full) return;
+
+    const file = event.dataTransfer.files?.[0];
+    if (file) void upload(file);
+  }
+
   return (
-    <div className="space-y-2">
+    <div
+      onDrop={onDrop}
+      onDragOver={(e) => {
+        e.preventDefault();
+        if (!disabled && !busy && !full) setDragging(true);
+      }}
+      onDragLeave={() => setDragging(false)}
+      className={cn(
+        "space-y-2 rounded-(--radius-control) transition-colors",
+        dragging && "outline-violet/60 bg-violet/5 outline-2 outline-dashed outline-offset-4",
+      )}
+    >
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          disabled={disabled || busy || items.length >= MAX_IMAGES_PER_FIELD}
+          disabled={disabled || busy || full}
           className="text-muted hover:text-text inline-flex items-center gap-1.5 text-xs transition-colors disabled:opacity-40"
         >
           {busy ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
           Attach evidence
         </button>
-        <span className="text-muted text-[11px]">or paste a screenshot into the box above</span>
+        <span className="text-muted text-[11px]">or drag an image here</span>
 
         <input
           ref={inputRef}

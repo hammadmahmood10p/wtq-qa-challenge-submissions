@@ -56,9 +56,14 @@ describe("LIMITS", () => {
    * All three cities start together and each venue is behind one NAT address, so from
    * the server several hundred people look like one client. A per-IP limit sized for a
    * single user would lock out a whole city at 10am.
+   *
+   * The floor used to be 200, which the load test of 2 October 2026 showed was far too
+   * low to catch the problem: at 300 the limiter refused 712 of 1012 sign-ins from one
+   * address. It is now set above the whole participant roster, because the worst case
+   * nobody has ruled out is all of them sharing one corporate egress address.
    */
-  it("keeps the per-IP login allowance large enough for a venue behind one address", () => {
-    expect(LIMITS.loginPerIp.limit).toBeGreaterThanOrEqual(200);
+  it("keeps the per-IP login allowance above the entire participant roster", () => {
+    expect(LIMITS.loginPerIp.limit).toBeGreaterThanOrEqual(1000);
   });
 
   it("keeps the per-account allowance tight, since that is the real defence", () => {

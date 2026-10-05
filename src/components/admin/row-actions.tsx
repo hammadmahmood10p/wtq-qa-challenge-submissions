@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, Check, Eraser, KeyRound, RotateCcw, Trash2, Undo2, X } from "lucide-react";
+import { Ban, Check, Eraser, KeyRound, LockOpen, RotateCcw, Trash2, Undo2, X } from "lucide-react";
 import { useState, useTransition } from "react";
 import {
   adminApproveJudge,
@@ -11,6 +11,7 @@ import {
   adminResetAttempt,
   adminResetPassword,
   adminUnblockUser,
+  adminUnlockChallenge1,
   type AdminState,
 } from "@/app/actions/admin";
 import { Alert } from "@/components/ui/alert";
@@ -26,13 +27,7 @@ import type { RosterRow } from "@/lib/roster";
 import { TempPasswordDialog } from "./temp-password-dialog";
 
 type Action =
-  | "block"
-  | "unblock"
-  | "remove"
-  | "reset"
-  | "approve"
-  | "reject"
-  | "restart";
+  "block" | "unblock" | "remove" | "reset" | "unlockChallenge1" | "approve" | "reject" | "restart";
 
 const CONFIRMATIONS: Partial<
   Record<Action, { title: string; body: (name: string) => string; verb: string; danger?: boolean }>
@@ -50,6 +45,12 @@ const CONFIRMATIONS: Partial<
       `${name} will be signed out and removed from the roster. Their submissions and history are kept, and you can restore them afterwards.`,
     verb: "Remove",
     danger: true,
+  },
+  unlockChallenge1: {
+    title: "Reopen Challenge 1 for this participant?",
+    body: (name) =>
+      `Challenge 1 becomes editable again for ${name} only, with everything they wrote still there. The Lock button reappears so they can hand it in again once they have made their changes. Challenges 2, 3 and 4 stay open and are not affected.`,
+    verb: "Reopen Challenge 1",
   },
   reset: {
     title: "Reset this password?",
@@ -92,8 +93,10 @@ export function RowActions({
   const [error, setError] = useState<string | null>(null);
 
   // Reopening asks a question the other actions do not — how long — so it gets its
-  // own dialog rather than a confirm.
-  const [reopening, setReopening] = useState(false);
+  // own dialog rather than a confirm. Unlocking Challenge 1 on a *sealed* attempt asks
+  // the same question, for the same reason: it lets them sign in again, and an account
+  // reopened onto a dead clock can log in and do nothing.
+  const [reopening, setReopening] = useState<"attempt" | "challenge1" | null>(null);
   const [minutes, setMinutes] = useState("");
 
   function run(action: Action) {
@@ -109,6 +112,9 @@ export function RowActions({
           break;
         case "remove":
           result = await adminRemoveUser(userId);
+          break;
+        case "unlockChallenge1":
+          result = await adminUnlockChallenge1(userId);
           break;
         case "reset":
           result = await adminResetPassword(userId);
@@ -132,14 +138,36 @@ export function RowActions({
 
   function runReopen() {
     setError(null);
+    const scope = reopening;
+
     startTransition(async () => {
-      const result = await adminReopenAttempt(userId, Number(minutes));
-      if (result.message) {
+      const result =
+        scope === "challenge1"
+          ? await adminUnlockChallenge1(userId, Number(minutes))
+          : await adminReopenAttempt(userId, Number(minutes));
+
+      if (result.message && !result.ok) {
         setError(result.message);
         return;
       }
-      setReopening(false);
+      setReopening(null);
     });
+  }
+
+  /**
+   * Unlocking Challenge 1 takes one of two routes.
+   *
+   * Mid-attempt it is only the seal coming off, so it confirms and goes. On an attempt
+   * already handed in it is a reopening — the account unlocks, the clock restarts —
+   * and the admin has to say how long, so it gets the minutes dialog instead.
+   */
+  function requestUnlockChallenge1() {
+    if (sealed) {
+      setMinutes(String(suggestedMinutes));
+      setReopening("challenge1");
+    } else {
+      request("unlockChallenge1");
+    }
   }
 
   /** Destructive and irreversible-feeling actions confirm; reversible ones do not. */
@@ -164,7 +192,12 @@ export function RowActions({
       <div className="flex items-center justify-end gap-1">
         {kind === "judge" && isPending && (
           <>
-            <Button size="sm" variant="primary" onClick={() => request("approve")} disabled={pending}>
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => request("approve")}
+              disabled={pending}
+            >
               <Check size={14} />
               Approve
             </Button>
@@ -182,7 +215,7 @@ export function RowActions({
               variant="secondary"
               onClick={() => {
                 setMinutes(String(suggestedMinutes));
-                setReopening(true);
+                setReopening("attempt");
               }}
               disabled={pending}
               title="Reopen — give the work back"
@@ -202,6 +235,23 @@ export function RowActions({
               <span className="sr-only">Clear {fullName}&apos;s attempt and restart</span>
             </Button>
           </>
+        )}
+
+        {/* Offered whenever Challenge 1 is sealed, regardless of whether the attempt
+            is still running — a participant who locked too early needs this during
+            their attempt, which is exactly when it is most urgent. */}
+        {attempt?.challenge1LockedAt && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={requestUnlockChallenge1}
+            disabled={pending}
+            title="Reopen Challenge 1 so they can edit their findings again"
+            className="hover:text-warning-strong"
+          >
+            <LockOpen size={14} />
+            <span className="sr-only">Unlock Challenge 1 for {fullName}</span>
+          </Button>
         )}
 
         {!isPending && !isRemoved && (
@@ -285,17 +335,38 @@ export function RowActions({
       </Dialog>
 
       <Dialog
-        open={reopening}
-        onClose={() => setReopening(false)}
-        title="Reopen this attempt?"
+        open={reopening !== null}
+        onClose={() => !pending && setReopening(null)}
+        title={
+          reopening === "challenge1"
+            ? "Reopen Challenge 1 for this participant?"
+            : "Reopen this attempt?"
+        }
       >
         <div className="space-y-4">
-          <p className="text-muted text-sm">
-            {fullName} will be able to log in again and carry on with everything they
-            had saved — findings, uploads, answers and their Challenge 3 or 4 choice
-            are all kept. Their submission is withheld from judging until they submit
-            again, and the new submission replaces the old one.
-          </p>
+          {reopening === "challenge1" ? (
+            <>
+              <p className="text-muted text-sm">
+                {fullName} will be able to log in again, and{" "}
+                <strong className="text-text">only Challenge 1 will be editable</strong>. Challenges
+                2, 3 and 4 have been submitted and stay submitted — their work in them is untouched
+                and cannot be changed.
+              </p>
+              <p className="text-muted text-sm">
+                When they submit again, their new Challenge 1 replaces the old one — nothing is
+                handed in twice, and judges see only the latest. Any marks already given for
+                Challenge 1 are cleared, because they describe work that is about to change; marks
+                for the other challenges are kept.
+              </p>
+            </>
+          ) : (
+            <p className="text-muted text-sm">
+              {fullName} will be able to log in again and carry on with everything they had saved —
+              findings, uploads, answers and their Challenge 3 or 4 choice are all kept. Their
+              submission is withheld from judging until they submit again, and the new submission
+              replaces the old one.
+            </p>
+          )}
 
           <div className="space-y-1.5">
             <label htmlFor={`minutes-${userId}`} className="block text-sm font-medium">
@@ -324,11 +395,11 @@ export function RowActions({
           )}
 
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setReopening(false)} disabled={pending}>
+            <Button variant="secondary" onClick={() => setReopening(null)} disabled={pending}>
               Cancel
             </Button>
             <Button variant="primary" onClick={runReopen} loading={pending}>
-              Reopen
+              {reopening === "challenge1" ? "Reopen Challenge 1" : "Reopen"}
             </Button>
           </div>
         </div>

@@ -30,6 +30,14 @@ export async function finalizeAttempt(
   options: { auto: boolean },
 ): Promise<FinalizeResult> {
   const result = await db.$transaction(async (tx) => {
+    const now = new Date();
+
+    // Read before the write, because the write is what changes it.
+    const before = await tx.attempt.findUnique({
+      where: { participantId },
+      select: { challenge1LockedAt: true, challenge1LockCount: true },
+    });
+
     // The guard is the WHERE clause. A double-tapped Confirm, a replayed request, or
     // the clock expiring at the same moment someone presses Submit must all end with
     // one sealed attempt.
@@ -37,11 +45,23 @@ export async function finalizeAttempt(
       where: { participantId, state: "IN_PROGRESS" },
       data: {
         state: "SUBMITTED",
-        submittedAt: new Date(),
+        submittedAt: now,
         autoSubmitted: options.auto,
         // If this attempt had been handed back by an admin, it is no longer withdrawn:
         // the replacement work has arrived and judging can see it again.
         reopenedAt: null,
+        // Submitting seals everything, Challenge 1 included. Two cases reach here with
+        // it unsealed: a super admin reopened Challenge 1 on a submitted attempt, and
+        // the clock ran out on someone who never locked it. Both are finished now, and
+        // leaving the seal off would show a submitted attempt as still editable.
+        ...(before?.challenge1LockedAt
+          ? {}
+          : {
+              challenge1LockedAt: now,
+              challenge1LockCount: Math.max(1, before?.challenge1LockCount ?? 0),
+            }),
+        // The Challenge-1-only grant is spent either way.
+        reopenedForChallenge1: false,
       },
     });
 

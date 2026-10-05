@@ -1,17 +1,19 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { Lock, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createEntry,
   deleteEntry,
+  lockChallenge1Action,
   moveEntry,
   updateEntry,
 } from "@/app/actions/challenge1";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { MAX_ENTRIES, isEntryComplete } from "@/lib/challenge1-limits";
+import { Dialog } from "@/components/ui/dialog";
+import { MAX_ENTRIES, canSealChallenge1, isEntryComplete } from "@/lib/challenge1-limits";
 import { retrySave, type RetryHandle } from "@/lib/retry-save";
 import { EntryDrawer, type DrawerEntry } from "./entry-drawer";
 import type { Evidence } from "./evidence-strip";
@@ -32,7 +34,14 @@ const AUTOSAVE_DELAY_MS = 900;
  * from a server response would move the caret mid-sentence, which is unforgivable in a
  * three-hour writing task.
  */
-export function Challenge1Workspace({ initialEntries }: { initialEntries: DrawerEntry[] }) {
+export function Challenge1Workspace({
+  initialEntries,
+  locked,
+}: {
+  initialEntries: DrawerEntry[];
+  /** Sealed: the findings are readable, nothing about them is editable. */
+  locked: boolean;
+}) {
   const router = useRouter();
 
   const [entries, setEntries] = useState<DrawerEntry[]>(initialEntries);
@@ -42,6 +51,25 @@ export function Challenge1Workspace({ initialEntries }: { initialEntries: Drawer
   const [saveStates, setSaveStates] = useState<Record<string, SaveState>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmingLock, setConfirmingLock] = useState(false);
+
+  /** Seals Challenge 1. The page reloads from the server so the tabs open. */
+  async function lock() {
+    setBusy(true);
+    setError(null);
+
+    const result = await lockChallenge1Action();
+    setBusy(false);
+
+    if (!result.ok) {
+      setConfirmingLock(false);
+      setError(result.error ?? "Could not lock Challenge 1.");
+      return;
+    }
+
+    setConfirmingLock(false);
+    router.refresh();
+  }
 
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   /** In-flight retries, one per entry, so a newer edit can cancel an older save. */
@@ -167,7 +195,10 @@ export function Challenge1Workspace({ initialEntries }: { initialEntries: Drawer
       prev.map((entry) => {
         if (entry.id !== id) return entry;
         const key = slot === "BUG" ? "bugEvidence" : "testEvidence";
-        const next = { ...entry, [key]: entry[key].filter((i) => i.id !== attachmentId) };
+        const next = {
+          ...entry,
+          [key]: entry[key].filter((i) => i.id !== attachmentId),
+        };
         if (pending.current.has(id)) pending.current.set(id, next);
         return next;
       }),
@@ -255,6 +286,12 @@ export function Challenge1Workspace({ initialEntries }: { initialEntries: Drawer
   const completeCount = entries.filter(isEntryComplete).length;
   const incompleteCount = entries.length - completeCount;
 
+  // Locking needs one finding worth judging, which is also what Submit needs. A
+  // participant allowed to lock after a single word would be unable to satisfy the
+  // submission requirement and unable to edit Challenge 1 to fix it — stuck until an
+  // admin rescued them. The gate closes that.
+  const canLock = canSealChallenge1(entries);
+
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -269,10 +306,7 @@ export function Challenge1Workspace({ initialEntries }: { initialEntries: Drawer
               {completeCount} {completeCount === 1 ? "finding" : "findings"} ready
             </span>
             {incompleteCount > 0 && (
-              <span className="text-warning-strong">
-                {" "}
-                · {incompleteCount} unfinished
-              </span>
+              <span className="text-warning-strong"> · {incompleteCount} unfinished</span>
             )}
             <span className="text-muted"> · limit {MAX_ENTRIES}</span>
           </p>
@@ -284,13 +318,16 @@ export function Challenge1Workspace({ initialEntries }: { initialEntries: Drawer
       {entries.length === 0 ? (
         <div className="border-border rounded-(--radius-card) border border-dashed p-8 text-center">
           <p className="text-muted mx-auto mb-4 max-w-md text-sm">
-            For each bug you find, write the report and the test case that covers it
-            together. You can attach screenshots as evidence.
+            {locked
+              ? "Challenge 1 was locked without any findings recorded."
+              : "For each bug you find, write the report and the test case that covers it together. You can attach screenshots as evidence."}
           </p>
-          <Button variant="brand" onClick={addEntry} loading={busy}>
-            <Plus size={15} />
-            Add Bug Report
-          </Button>
+          {!locked && (
+            <Button variant="brand" onClick={addEntry} loading={busy}>
+              <Plus size={15} />
+              Add Bug Report
+            </Button>
+          )}
         </div>
       ) : (
         <>
@@ -302,6 +339,7 @@ export function Challenge1Workspace({ initialEntries }: { initialEntries: Drawer
                 index={index}
                 expanded={expanded.has(entry.id)}
                 onToggle={() => toggle(entry.id)}
+                disabled={locked}
                 saveState={saveStates[entry.id] ?? "idle"}
                 onChange={(patch) => onChange(entry.id, patch)}
                 onEvidenceAdded={(slot, item) => onEvidenceAdded(entry.id, slot, item)}
@@ -316,20 +354,99 @@ export function Challenge1Workspace({ initialEntries }: { initialEntries: Drawer
             ))}
           </div>
 
-          {/* Outside the drawers, so nothing has to be collapsed to add the next one. */}
-          <Button variant="secondary" onClick={addEntry} loading={busy} disabled={atCap}>
-            <Plus size={15} />
-            Add Another Bug Report
-          </Button>
+          {/* Outside the drawers, so nothing has to be collapsed to add the next one.
+              Gone entirely once locked rather than disabled: a greyed-out button
+              invites a participant to keep trying it. */}
+          {!locked && (
+            <>
+              <Button variant="secondary" onClick={addEntry} loading={busy} disabled={atCap}>
+                <Plus size={15} />
+                Add Another Bug Report
+              </Button>
 
-          {atCap && (
-            <p className="text-muted text-xs">
-              You have reached the limit of {MAX_ENTRIES} findings. Edit an existing one
-              instead.
-            </p>
+              {atCap && (
+                <p className="text-muted text-xs">
+                  You have reached the limit of {MAX_ENTRIES} findings. Edit an existing one
+                  instead.
+                </p>
+              )}
+            </>
           )}
         </>
       )}
+
+      {/*
+        Locking, and what it opens.
+
+        Deliberately below the findings rather than beside the Add button: it is the
+        end of this challenge, not another way to edit it, and a destructive one-way
+        control sitting next to "Add Another" is asking to be hit by accident.
+      */}
+      {!locked && (
+        <div className="border-violet/30 bg-violet/5 mt-8 rounded-(--radius-card) border p-5">
+          <h3 className="font-display text-sm font-semibold">Finished with Challenge 1?</h3>
+          <p className="text-muted mt-1.5 max-w-2xl text-xs">
+            Locking hands in your manual testing and opens Challenges 2, 3 and 4. Your findings stay
+            visible afterwards, but you will not be able to change them — that is the point of the
+            order: the manual work is done before you see what the AI challenges ask.
+          </p>
+
+          {!canLock && (
+            <p className="text-warning-strong mt-3 text-xs">
+              Write at least one finding with its bug report and test case both complete before you
+              can lock.
+            </p>
+          )}
+
+          <Button
+            variant="brand"
+            className="mt-4"
+            disabled={!canLock || busy}
+            onClick={() => setConfirmingLock(true)}
+          >
+            <Lock size={15} />
+            Lock Challenge 1
+          </Button>
+        </div>
+      )}
+
+      <Dialog
+        open={confirmingLock}
+        onClose={() => !busy && setConfirmingLock(false)}
+        title="Lock Challenge 1 and move on?"
+      >
+        <div className="space-y-4">
+          <Alert variant="warning" title="This cannot be undone">
+            Once Challenge 1 is locked you will not be able to add, edit or remove findings.
+            Everything you have written stays, and you can still read it — but only a super admin
+            can reopen it for changes.
+          </Alert>
+
+          <p className="text-muted text-sm">
+            You are handing in{" "}
+            <strong className="text-text">
+              {completeCount} {completeCount === 1 ? "finding" : "findings"}
+            </strong>
+            {incompleteCount > 0 && (
+              <>
+                {" "}
+                — the {incompleteCount} unfinished {incompleteCount === 1 ? "one" : "ones"} will not
+                be handed in
+              </>
+            )}
+            . Challenges 2, 3 and 4 open as soon as you confirm.
+          </p>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setConfirmingLock(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button variant="brand" onClick={() => void lock()} loading={busy}>
+              Confirm
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </section>
   );
 }

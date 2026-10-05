@@ -46,12 +46,27 @@ export default async function Challenge1Page() {
         </Alert>
       )}
 
-      <Alert variant="info">
-        Write each bug report alongside the test case that covers it. Everything saves
-        automatically, and you can paste a screenshot straight into either description.
-      </Alert>
+      {attempt.challenge1LockedAt ? (
+        <Alert variant="success" title="Challenge 1 is locked">
+          You handed this in on{" "}
+          {attempt.challenge1LockedAt.toLocaleString("en-GB", {
+            dateStyle: "medium",
+            timeStyle: "short",
+          })}
+          . Your findings are below and are being judged as they stand. If something
+          needs changing, a super admin can reopen Challenge 1 for you.
+        </Alert>
+      ) : (
+        <Alert variant="info">
+          Write each bug report alongside the test case that covers it. Everything saves
+          automatically. Copying and pasting are turned off in these fields — attach
+          screenshots with the <strong>Attach evidence</strong> button, or by dragging an
+          image onto the strip under each box.
+        </Alert>
+      )}
 
       <Challenge1Workspace
+        locked={Boolean(attempt.challenge1LockedAt)}
         initialEntries={entries.map((entry) => ({
           id: entry.id,
           bugTitle: entry.bugTitle,
