@@ -11,6 +11,7 @@ import {
 import {
   saveBonus,
   saveChallengeScores,
+  saveJudgeComment,
   submitFinalScore,
   unlockEvaluation,
   type EvaluationActor,
@@ -87,6 +88,21 @@ export async function claimSubmissionAction(attemptId: string): Promise<Evaluati
   const result = await claimSubmission(attemptId, who);
   if (result.ok) refresh(attemptId);
   return result;
+}
+
+/**
+ * Saves the judge's note against a submission.
+ *
+ * Deliberately does not call `refresh`. This autosaves while the judge is typing, and
+ * revalidating three routes per keystroke-debounce would re-render the table under
+ * them — including the box they are typing in. The rest of the panel picks the comment
+ * up on their next refresh, which is what was asked for.
+ */
+export async function saveJudgeCommentAction(
+  attemptId: string,
+  comment: string,
+): Promise<EvaluationResult> {
+  return saveJudgeComment(attemptId, comment, await actor());
 }
 
 /** Super admin only: puts a submission back in the pool, keeping its scores. */

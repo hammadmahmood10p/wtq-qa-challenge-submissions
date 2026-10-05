@@ -24,6 +24,18 @@ export interface AttemptView {
   autoSubmitted: boolean;
   durationMinutes: number;
   chosenTrack: ChallengeTrack | null;
+
+  /** Set once the participant seals Challenge 1. Null while it is still editable. */
+  challenge1LockedAt: Date | null;
+
+  /**
+   * Whether Challenge 1 has ever been sealed, which is what opens Challenges 2 to 4.
+   *
+   * Distinct from the timestamp above: a super admin unlocking Challenge 1 for a
+   * correction clears the lock but must not close the other challenges again, which
+   * would hide work the participant has already done on them.
+   */
+  challenge1EverLocked: boolean;
   /** Server time at the moment this was read, so the client can correct its own clock. */
   serverNow: Date;
   remainingMs: number;
@@ -121,6 +133,8 @@ export const getAttempt = cache(async (participantId: string): Promise<AttemptVi
     autoSubmitted: attempt.autoSubmitted,
     durationMinutes: attempt.durationMinutes,
     chosenTrack: attempt.chosenTrack,
+    challenge1LockedAt: attempt.challenge1LockedAt,
+    challenge1EverLocked: attempt.challenge1LockCount > 0,
     serverNow,
     remainingMs: attempt.endsAt ? Math.max(0, attempt.endsAt.getTime() - serverNow.getTime()) : 0,
   };

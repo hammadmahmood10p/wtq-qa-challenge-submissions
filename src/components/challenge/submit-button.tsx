@@ -1,8 +1,9 @@
 "use client";
 
-import { AlertTriangle, Check, Lock, Send } from "lucide-react";
+import { AlertTriangle, Check, Loader2, Lock, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { currentProgress } from "@/app/actions/attempt";
 import { submitEverything } from "@/app/actions/submit";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -28,9 +29,38 @@ export function SubmitButton({ progress }: { progress: Progress }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const blocked = !progress.mandatoryComplete;
-  const outstanding = progress.mandatory.filter((item) => !item.complete);
-  const ready = progress.items.filter((item) => item.complete);
+  /**
+   * Progress as of opening the dialog, which is the only moment it is read.
+   *
+   * The prop is a snapshot from the last page render, and every autosave since has
+   * aged it — a participant who finished Challenge 3 on this screen would otherwise be
+   * shown Challenges 1 and 2 and told the third was unfinished, until they refreshed.
+   * Null until the first fetch returns, after which the fresh answer wins.
+   */
+  const [latest, setLatest] = useState<Progress | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const live = latest ?? progress;
+
+  function openDialog() {
+    setOpen(true);
+    setError(null);
+    setLoading(true);
+
+    // Not a transition: this must not be interrupted or batched away, and the dialog
+    // waits on it rather than showing a count that may be about to change.
+    currentProgress()
+      .then(setLatest)
+      .catch(() => {
+        // Keep the snapshot and carry on. The server re-checks everything on submit,
+        // so a failed refresh costs accuracy in the list, never correctness.
+      })
+      .finally(() => setLoading(false));
+  }
+
+  const blocked = !live.mandatoryComplete;
+  const outstanding = live.mandatory.filter((item) => !item.complete);
+  const ready = live.items.filter((item) => item.complete);
 
   function confirm() {
     setError(null);
@@ -65,15 +95,14 @@ export function SubmitButton({ progress }: { progress: Progress }) {
             id="submit-blocked-reason"
             className="text-muted max-w-[15rem] text-right text-[11px] leading-snug"
           >
-            Finish Challenges 1 and 2 and choose Challenge 3 or 4 to submit. If time
-            runs out first, everything you have saved is submitted automatically —
-            nothing is lost.
+            Finish Challenges 1 and 2 and choose Challenge 3 or 4 to submit. If time runs out first,
+            everything you have saved is submitted automatically — nothing is lost.
           </p>
         )}
 
         <Button
           variant={blocked ? "secondary" : "brand"}
-          onClick={() => setOpen(true)}
+          onClick={openDialog}
           // aria-disabled, not disabled. It reads as inactive and refuses to submit,
           // but stays focusable so it can still explain itself — a truly disabled
           // control cannot be reached by keyboard or announced, which would leave a
@@ -90,13 +119,27 @@ export function SubmitButton({ progress }: { progress: Progress }) {
       <Dialog
         open={open}
         onClose={() => !pending && setOpen(false)}
-        title={blocked ? "Not ready to submit yet" : "Submit your work?"}
+        title={
+          loading
+            ? "Checking your work…"
+            : blocked
+              ? "Not ready to submit yet"
+              : "Submit your work?"
+        }
       >
-        {blocked ? (
+        {/* Waits rather than showing the snapshot first and correcting it. A list that
+            appears, then rewrites itself under someone about to press an irreversible
+            button, is worse than a short pause. */}
+        {loading ? (
+          <div className="text-muted flex items-center gap-2.5 py-6 text-sm">
+            <Loader2 size={16} className="animate-spin shrink-0" />
+            Checking everything you have saved…
+          </div>
+        ) : blocked ? (
           <div className="space-y-5">
             <p className="text-muted text-sm">
-              Challenges 1 and 2 are compulsory, and you must commit to either Challenge 3
-              or Challenge 4, before you can hand everything in. Still outstanding:
+              Challenges 1 and 2 are compulsory, and you must commit to either Challenge 3 or
+              Challenge 4, before you can hand everything in. Still outstanding:
             </p>
 
             <ul className="space-y-2">
@@ -124,16 +167,16 @@ export function SubmitButton({ progress }: { progress: Progress }) {
                     Choose Challenge 3 or Challenge 4
                   </p>
                   <p className="text-muted mt-1 text-xs">
-                    They are alternatives and you must commit to one. The choice cannot
-                    be changed afterwards.
+                    They are alternatives and you must commit to one. The choice cannot be changed
+                    afterwards.
                   </p>
                 </li>
               )}
             </ul>
 
             <p className="text-muted text-xs">
-              If the clock runs out first, everything you have saved is submitted
-              automatically — you will not lose it.
+              If the clock runs out first, everything you have saved is submitted automatically —
+              you will not lose it.
             </p>
 
             <div className="flex justify-end">
@@ -185,9 +228,8 @@ export function SubmitButton({ progress }: { progress: Progress }) {
                 This cannot be undone
               </p>
               <p className="text-danger-strong mt-1.5 text-sm font-medium">
-                Submitting closes your attempt for good. You will be signed out, you
-                will not be able to log in again, and nothing can be changed or added
-                afterwards.
+                Submitting closes your attempt for good. You will be signed out, you will not be
+                able to log in again, and nothing can be changed or added afterwards.
               </p>
             </div>
 

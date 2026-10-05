@@ -49,6 +49,33 @@ export function isEntryComplete(entry: Challenge1EntryFields): boolean {
   );
 }
 
+/**
+ * Whether Challenge 1 holds enough to be sealed.
+ *
+ * Not politeness — it closes a trap. Submitting requires at least one finding with its
+ * bug report and test case both written, and a sealed Challenge 1 cannot be edited. A
+ * participant who locked after typing a single word would be unable to satisfy that
+ * requirement and unable to fix it, stuck until an admin rescued them.
+ *
+ * The same function decides whether the Lock button is live and whether the server
+ * accepts the lock, so the button is never offered for a press that will be refused.
+ */
+export function canSealChallenge1(entries: Challenge1EntryFields[]): boolean {
+  return entries.some(isEntryComplete);
+}
+
+/**
+ * Whether a challenge other than the first is reachable yet.
+ *
+ * The organisers want the manual testing done before the AI challenges are visible, so
+ * Challenge 1 is the only one open at the start. The gate reads `everLocked`, not "is
+ * locked now": a participant whose Challenge 1 a super admin reopened keeps Challenges
+ * 2 to 4 — they are being allowed to correct something, not sent back to the start.
+ */
+export function isChallengeReachable(challengeId: string, everLockedChallenge1: boolean): boolean {
+  return challengeId === "C1" || everLockedChallenge1;
+}
+
 /** Which of the four are still blank, in reading order, for telling someone why. */
 export function missingEntryParts(entry: Challenge1EntryFields): string[] {
   const missing: string[] = [];

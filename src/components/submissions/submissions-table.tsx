@@ -1,8 +1,10 @@
 import { ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EmptyRow, TableShell, Td, Th, Thead, Tr } from "@/components/ui/table";
+import { canCommentOnSubmission } from "@/lib/evaluation-limits";
 import type { SubmissionRow } from "@/lib/submissions";
 import { AssignmentActions } from "./assignment-actions";
+import { JudgeComment } from "./judge-comment";
 import { SortableHeader } from "./sortable-header";
 
 const LOCATION_LABELS: Record<string, string> = {
@@ -22,9 +24,18 @@ export function SubmissionsTable({
   rows,
   emptyMessage,
   role,
+  viewerId,
 }: {
   rows: SubmissionRow[];
   emptyMessage: string;
+  /**
+   * Who is looking, by id.
+   *
+   * Only the Comments column needs it, and only to decide between a box and a
+   * paragraph. The server decides the same thing again on every save, so a tampered
+   * client gets a refusal rather than a comment in somebody else's name.
+   */
+  viewerId: string;
   /**
    * Who is looking.
    *
@@ -52,13 +63,16 @@ export function SubmissionsTable({
             Score
           </SortableHeader>
           <Th>Judge</Th>
+          {/* The holding judge's own note, visible to the whole panel. Not sortable:
+              it is prose, and sorting prose alphabetically answers no question. */}
+          <Th>Comments</Th>
           <Th>Actions</Th>
         </Tr>
       </Thead>
 
       <tbody>
         {rows.length === 0 ? (
-          <EmptyRow colSpan={9}>{emptyMessage}</EmptyRow>
+          <EmptyRow colSpan={10}>{emptyMessage}</EmptyRow>
         ) : (
           rows.map((row) => (
             <Tr key={row.attemptId}>
@@ -90,7 +104,9 @@ export function SubmissionsTable({
 
               <Td className="whitespace-nowrap">
                 {row.reviewed ? (
-                  <Badge className="border-success/30 bg-success/10 text-success-strong">Reviewed</Badge>
+                  <Badge className="border-success/30 bg-success/10 text-success-strong">
+                    Reviewed
+                  </Badge>
                 ) : (
                   <Badge>Not reviewed</Badge>
                 )}
@@ -120,6 +136,22 @@ export function SubmissionsTable({
                 ) : (
                   <span className="text-muted text-sm">Unassigned</span>
                 )}
+              </Td>
+
+              {/* Editable only by whoever holds the submission — a super admin reads
+                  it like everyone else. The column says what the judge who reviewed
+                  this thought, and a second hand writing into it under the same name
+                  would make it say something else. */}
+              <Td className="align-top">
+                <JudgeComment
+                  attemptId={row.attemptId}
+                  initialComment={row.comment}
+                  canEdit={canCommentOnSubmission({
+                    holdingJudgeId: row.judgeId,
+                    viewerId,
+                  })}
+                  judgeName={row.judgeName}
+                />
               </Td>
 
               <Td>

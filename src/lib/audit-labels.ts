@@ -82,6 +82,12 @@ const DESCRIPTORS: Record<AuditAction, AuditDescriptor> = {
   // --- Attempts -------------------------------------------------------------
   "attempt.started": { label: "Started their attempt", category: "Attempts", tone: "neutral" },
   "attempt.track_chosen": { label: "Chose their track", category: "Attempts", tone: "neutral" },
+  "challenge1.locked": { label: "Locked Challenge 1", category: "Attempts", tone: "info" },
+  "challenge1.unlocked": {
+    label: "Reopened Challenge 1 for a participant",
+    category: "Attempts",
+    tone: "warning",
+  },
   "attempt.submitted": { label: "Submitted their work", category: "Attempts", tone: "success" },
   "attempt.auto_submitted": {
     label: "Submitted automatically when time ran out",

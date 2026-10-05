@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, Check, Eraser, KeyRound, RotateCcw, Trash2, Undo2, X } from "lucide-react";
+import { Ban, Check, Eraser, KeyRound, LockOpen, RotateCcw, Trash2, Undo2, X } from "lucide-react";
 import { useState, useTransition } from "react";
 import {
   adminApproveJudge,
@@ -11,6 +11,7 @@ import {
   adminResetAttempt,
   adminResetPassword,
   adminUnblockUser,
+  adminUnlockChallenge1,
   type AdminState,
 } from "@/app/actions/admin";
 import { Alert } from "@/components/ui/alert";
@@ -30,6 +31,7 @@ type Action =
   | "unblock"
   | "remove"
   | "reset"
+  | "unlockChallenge1"
   | "approve"
   | "reject"
   | "restart";
@@ -50,6 +52,12 @@ const CONFIRMATIONS: Partial<
       `${name} will be signed out and removed from the roster. Their submissions and history are kept, and you can restore them afterwards.`,
     verb: "Remove",
     danger: true,
+  },
+  unlockChallenge1: {
+    title: "Reopen Challenge 1 for this participant?",
+    body: (name) =>
+      `Challenge 1 becomes editable again for ${name} only, with everything they wrote still there. The Lock button reappears so they can hand it in again once they have made their changes. Challenges 2, 3 and 4 stay open and are not affected.`,
+    verb: "Reopen Challenge 1",
   },
   reset: {
     title: "Reset this password?",
@@ -109,6 +117,9 @@ export function RowActions({
           break;
         case "remove":
           result = await adminRemoveUser(userId);
+          break;
+        case "unlockChallenge1":
+          result = await adminUnlockChallenge1(userId);
           break;
         case "reset":
           result = await adminResetPassword(userId);
@@ -202,6 +213,23 @@ export function RowActions({
               <span className="sr-only">Clear {fullName}&apos;s attempt and restart</span>
             </Button>
           </>
+        )}
+
+        {/* Offered whenever Challenge 1 is sealed, regardless of whether the attempt
+            is still running — a participant who locked too early needs this during
+            their attempt, which is exactly when it is most urgent. */}
+        {attempt?.challenge1LockedAt && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => request("unlockChallenge1")}
+            disabled={pending}
+            title="Reopen Challenge 1 so they can edit their findings again"
+            className="hover:text-warning-strong"
+          >
+            <LockOpen size={14} />
+            <span className="sr-only">Unlock Challenge 1 for {fullName}</span>
+          </Button>
         )}
 
         {!isPending && !isRemoved && (

@@ -55,6 +55,11 @@ export interface RosterRow {
     resetCount: number;
     /** Set while an admin has handed it back and it has not been resubmitted. */
     reopenedAt: Date | null;
+    /**
+     * When they sealed Challenge 1. Null means it is still theirs to edit — and
+     * drives the Unlock button, which is the only way back once it is set.
+     */
+    challenge1LockedAt: Date | null;
   } | null;
 }
 
@@ -139,6 +144,7 @@ export async function listParticipants(query: RosterQuery) {
                 submittedAt: true,
                 reopenedAt: true,
                 reopenCount: true,
+                challenge1LockedAt: true,
                 resetCount: true,
               },
             },
@@ -173,6 +179,7 @@ export async function listParticipants(query: RosterQuery) {
           reopenCount: u.participantProfile.attempt.reopenCount,
           resetCount: u.participantProfile.attempt.resetCount,
           reopenedAt: u.participantProfile.attempt.reopenedAt,
+          challenge1LockedAt: u.participantProfile.attempt.challenge1LockedAt,
         }
       : null,
   }));

@@ -8,6 +8,7 @@ import { inputClasses } from "@/components/ui/field";
 import type { ChallengeKey } from "@/generated/prisma/enums";
 import type { ChallengeQuestion } from "@/lib/challenge-content";
 import { retrySave, type RetryHandle } from "@/lib/retry-save";
+import { NO_CLIPBOARD_HINT, noClipboard } from "@/lib/no-clipboard";
 import { cn } from "@/lib/utils";
 import { SaveIndicator, type SaveState } from "./save-indicator";
 
@@ -125,6 +126,8 @@ export function ChallengeAnswers({
 
   const answered = questions.filter((q) => (answers[q.key] ?? "").trim()).length;
   const required = questions.filter((q) => q.required).length;
+  const [blocked, setBlocked] = useState(false);
+  const clipboard = noClipboard(() => setBlocked(true));
 
   return (
     <section className="space-y-6">
@@ -136,6 +139,16 @@ export function ChallengeAnswers({
       </div>
 
       {error && <Alert variant="error">{error}</Alert>}
+
+      {/* Once per card rather than under each box: a participant who tried to paste
+          into three fields does not need telling three times, and a blocked paste
+          that says nothing reads as a broken form. */}
+      {blocked && (
+        <Alert variant="info">
+          {NO_CLIPBOARD_HINT} These answers are about your own approach, so they are the
+          part that has to be in your words.
+        </Alert>
+      )}
 
       <div className="grid gap-6 xl:grid-cols-2">
         {questions.map((question) => {
@@ -164,6 +177,11 @@ export function ChallengeAnswers({
                 maxLength={question.maxLength}
                 rows={question.rows}
                 placeholder={question.placeholder}
+                // Required answers describe the participant's own approach and
+                // reasoning, which is the thing being marked — so they are typed, not
+                // pasted. Optional questions are left alone: blocking the clipboard on
+                // a field nobody is assessed on is friction for its own sake.
+                {...(question.required ? clipboard : {})}
                 className={cn(inputClasses(), "resize-y text-[13px] leading-relaxed")}
               />
 

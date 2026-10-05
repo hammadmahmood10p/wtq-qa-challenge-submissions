@@ -211,6 +211,24 @@ model Attempt {
   /// see that the attempt was interrupted without digging through the audit log.
   reopenedAt  DateTime?
   reopenCount Int       @default(0)
+
+  /// When the participant sealed Challenge 1. Null means it is open for editing.
+  ///
+  /// Challenge 1 is handed in before the others begin: the organisers want the manual
+  /// testing done without the AI challenges visible, so it locks and the rest unlock.
+  /// Only a super admin can reopen it — deliberately not covered by reopening the
+  /// attempt, because handing back a submission and reopening finished manual work are
+  /// different decisions and conflating them would undo the first silently.
+  challenge1LockedAt DateTime?
+
+  /// How many times it has been locked.
+  ///
+  /// Separate from `challenge1LockedAt` because the two answer different questions.
+  /// "Is it editable right now" is the timestamp; "may the other challenges be opened"
+  /// is this count — and once it has been locked once, an admin unlocking Challenge 1
+  /// for a correction must not also hide the work the participant has already done on
+  /// Challenges 2 to 4.
+  challenge1LockCount Int @default(0)
   /// Incremented when the attempt is wiped for a fresh run. The work itself is gone.
   resetCount  Int       @default(0)
 
@@ -351,6 +369,13 @@ model Evaluation {
   /// by the judge or a super admin — down to -5 where the work does not justify it.
   /// Signed, so it is an adjustment rather than a reward that can only be given.
   bonusPoints Decimal? @db.Decimal(6, 2)
+
+  /// A free note from the judge holding this submission, shown in the shared table.
+  ///
+  /// On the evaluation rather than on the attempt so it travels with the review: it
+  /// survives a handover, and the judge who picks a released submission up sees what
+  /// the last one thought before starting again.
+  comment String?
 
   // Frozen at the moment of final submission, so a later change to the score
   // configuration can never retroactively alter a submitted result.

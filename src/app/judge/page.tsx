@@ -23,7 +23,7 @@ export default async function JudgeSubmissionsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireRole("JUDGE");
+  const judge = await requireRole("JUDGE");
 
   const query = parseSubmissionsQuery(await searchParams);
 
@@ -59,6 +59,7 @@ export default async function JudgeSubmissionsPage({
       <SubmissionsTable
         rows={rows}
         role="JUDGE"
+        viewerId={judge.id}
         emptyMessage="No submissions match these filters."
       />
 

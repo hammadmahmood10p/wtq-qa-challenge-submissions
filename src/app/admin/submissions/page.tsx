@@ -18,7 +18,7 @@ export default async function AdminSubmissionsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireRole("SUPER_ADMIN");
+  const admin = await requireRole("SUPER_ADMIN");
 
   const query = parseSubmissionsQuery(await searchParams);
 
@@ -46,6 +46,7 @@ export default async function AdminSubmissionsPage({
       <SubmissionsTable
         rows={rows}
         role="SUPER_ADMIN"
+        viewerId={admin.id}
         emptyMessage="No submissions match these filters."
       />
 

@@ -73,20 +73,32 @@ const nextConfig: NextConfig = {
  *
  * Revisit after the event, when nonces can be introduced and tested properly.
  */
+const isDev = process.env.NODE_ENV === "development";
+
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  // 'unsafe-eval' is **development only**. React's development build uses eval() to
+  // rebuild call stacks for its error overlay, so without it every page dies on an
+  // "eval() is not supported in this environment" console error and nothing can be
+  // tested locally. It is never emitted by `next build`, which is the policy IT
+  // scanned — if you are reading this because a scanner flagged 'unsafe-eval', check
+  // which build produced the header before changing anything.
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   // data: for the inlined SVG icons, blob: for client-side image previews of evidence
   // before it is uploaded.
   "img-src 'self' data: blob:",
   "font-src 'self'",
-  "connect-src 'self'",
+  // Turbopack pushes hot reloads down a websocket in development; production talks to
+  // nothing but its own origin.
+  `connect-src 'self'${isDev ? " ws: wss:" : ""}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  "upgrade-insecure-requests",
+  // Would rewrite http://localhost to https:// and break every local request, so it is
+  // left off in development. Production is behind TLS and keeps it.
+  ...(isDev ? [] : ["upgrade-insecure-requests"]),
 ].join("; ");
 
 export default nextConfig;

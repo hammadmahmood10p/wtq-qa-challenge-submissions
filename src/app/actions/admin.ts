@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { reopenAttempt, resetAttempt } from "@/lib/attempt-admin";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth";
+import { unlockChallenge1 } from "@/lib/challenge1-lock";
 import { encryptCnic, hashCnic } from "@/lib/crypto";
 import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
@@ -557,4 +558,24 @@ export async function adminCreateSuperAdmin(
   refresh();
   revalidatePath("/admin/admins");
   return { ok: true, tempPassword: formatTempPassword(tempPassword) };
+}
+
+/**
+ * Reopens Challenge 1 for one participant.
+ *
+ * Its own action, separate from reopening the attempt, because the two are different
+ * decisions. Giving somebody twenty more minutes after a laptop failure should not
+ * also reopen the manual testing they finished before seeing the AI challenges — that
+ * sequence is the whole reason Challenge 1 locks, and undoing it silently would be the
+ * worst kind of helpful.
+ */
+export async function adminUnlockChallenge1(participantId: string): Promise<AdminState> {
+  const admin = await requireRole("SUPER_ADMIN");
+
+  const result = await unlockChallenge1(participantId, admin.id);
+  if (!result.ok) return { message: result.message };
+
+  revalidatePath("/admin/participants");
+
+  return { ok: true, message: "Challenge 1 is open again for this participant." };
 }

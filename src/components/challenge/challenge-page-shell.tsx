@@ -8,6 +8,7 @@ import { attemptProgress } from "@/lib/attempt-progress";
 import { requireRole } from "@/lib/auth";
 import { challengeById, isChallengeOpen } from "@/lib/challenge-content";
 import type { Progress } from "@/lib/challenge-progress";
+import { isChallengeReachable } from "@/lib/challenge1-limits";
 import { getSubmission } from "@/lib/challenge-submissions";
 
 /**
@@ -23,6 +24,11 @@ export async function loadChallengePage(challenge: ChallengeKey) {
 
   if (attempt.state === "NOT_STARTED") redirect("/challenge");
   if (attempt.state === "SUBMITTED" || attempt.state === "EXPIRED") redirect("/submitted");
+
+  // Challenges 2 to 4 do not exist for this participant until Challenge 1 is sealed.
+  // The tabs already grey them out; this is the rule behind that hint, for a typed URL
+  // or a bookmark from a previous attempt.
+  if (!isChallengeReachable(challenge, attempt.challenge1EverLocked)) redirect("/challenge/c1");
 
   const definition = challengeById(challenge)!;
   const open = isChallengeOpen(definition, attempt.chosenTrack);

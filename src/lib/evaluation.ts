@@ -3,6 +3,7 @@ import "server-only";
 import type { ChallengeKey } from "@/generated/prisma/enums";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
+import { canCommentOnSubmission, MAX_JUDGE_COMMENT } from "@/lib/evaluation-limits";
 import {
   BONUS_AMOUNT,
   isBonusValue,
@@ -308,6 +309,58 @@ export async function submitFinalScore(
   });
 
   return { ok: true, total };
+}
+
+export { MAX_JUDGE_COMMENT } from "@/lib/evaluation-limits";
+
+/**
+ * The judge's note against a submission, shown to the whole panel.
+ *
+ * Two things make this different from everything else in this file, and both were
+ * asked for directly:
+ *
+ *   1. **It does not freeze.** Every other write here stops once the score is
+ *      submitted, because a result that can be quietly rewritten is not a result. A
+ *      comment is not a result — it is the judge explaining themselves to the rest of
+ *      the panel, and that explanation is most often wanted *after* the score is in.
+ *      So `guard()` is deliberately not used; only the holder check is.
+ *   2. **A super admin may not write it.** They can read it, like every other judge,
+ *      but the column says what the judge who reviewed this thought, and a second
+ *      hand writing into it under the same name would make it say something else.
+ *      Releasing the submission and taking it is the honest route.
+ *
+ * "The holder" means whoever holds it now, not whoever first claimed it. A submission
+ * that has been unassigned and picked up by someone else belongs to the new judge,
+ * comment included — they are the one answering for it.
+ */
+export async function saveJudgeComment(
+  attemptId: string,
+  comment: string,
+  actor: EvaluationActor,
+): Promise<EvaluationResult> {
+  const evaluation = await load(attemptId);
+  if (!evaluation) return { ok: false, message: "This submission has no judge assigned yet." };
+
+  if (!canCommentOnSubmission({ holdingJudgeId: evaluation.judgeId, viewerId: actor.id })) {
+    return {
+      ok: false,
+      message:
+        evaluation.judgeId === null
+          ? "Assign this submission to yourself before commenting on it."
+          : "Only the judge holding this submission can comment on it.",
+    };
+  }
+
+  const trimmed = comment.trim().slice(0, MAX_JUDGE_COMMENT);
+
+  // Cleared back to null rather than stored as "", so "no comment" is one state in
+  // the database instead of two that the table would have to tell apart.
+  await db.evaluation.update({
+    where: { id: evaluation.id },
+    data: { comment: trimmed === "" ? null : trimmed },
+  });
+
+  return { ok: true };
 }
 
 /**

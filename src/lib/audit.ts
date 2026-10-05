@@ -49,6 +49,8 @@ export type AuditAction =
   | "admin.challenge4_csv_removed"
   | "attempt.started"
   | "attempt.track_chosen"
+  | "challenge1.locked"
+  | "challenge1.unlocked"
   | "attempt.submitted"
   | "attempt.auto_submitted"
   | "evaluation.assigned"
