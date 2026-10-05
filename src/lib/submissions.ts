@@ -52,6 +52,14 @@ export interface SubmissionRow {
   assigned: boolean;
 
   /**
+   * The holding judge's note, shown to the whole panel. Null when nothing is written.
+   *
+   * Everyone sees it; only the judge who holds the submission can change it, which the
+   * table works out by comparing `judgeId` against the person looking.
+   */
+  comment: string | null;
+
+  /**
    * How many of the three challenges this participant actually finished.
    *
    * Counted the same way the participant's own screen counted it, so a judge and a
@@ -195,6 +203,7 @@ export async function listSubmissions(query: SubmissionsQuery) {
             status: true,
             totalScore: true,
             judgeId: true,
+            comment: true,
             judge: { select: { fullName: true } },
           },
         },
@@ -228,6 +237,7 @@ export async function listSubmissions(query: SubmissionsQuery) {
       // no longer the same question as "has this been looked at". A released or
       // reopened submission has a row full of scores and nobody against it.
       assigned: Boolean(evaluation?.judgeId),
+      comment: evaluation?.comment ?? null,
       challengesCompleted: completed.get(attempt.id) ?? 0,
       challengesTotal: TOTAL_CHALLENGES,
     };

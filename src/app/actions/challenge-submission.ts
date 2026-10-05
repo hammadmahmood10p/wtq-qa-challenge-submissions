@@ -45,6 +45,17 @@ async function withOpenChallenge(
 
     if (!definition) return { ok: false, error: "That challenge does not exist." };
 
+    // Reopened for Challenge 1 alone. Challenges 2 to 4 were handed in and stay handed
+    // in — refused on the server, not merely hidden, because the interface closing a
+    // door is not the same as the door being shut.
+    if (attempt.reopenedForChallenge1) {
+      return {
+        ok: false,
+        error:
+          "Only Challenge 1 was reopened for you. Challenges 2, 3 and 4 have already been submitted and cannot be changed.",
+      };
+    }
+
     if (!isChallengeOpen(definition, attempt.chosenTrack)) {
       return {
         ok: false,

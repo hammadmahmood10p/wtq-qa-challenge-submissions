@@ -10,8 +10,9 @@ import {
   isEntryComplete,
   missingEntryParts,
 } from "@/lib/challenge1-limits";
+import { NO_CLIPBOARD_HINT, noClipboard } from "@/lib/no-clipboard";
 import { cn } from "@/lib/utils";
-import { EvidenceStrip, imageFromPaste, type Evidence } from "./evidence-strip";
+import { EvidenceStrip, type Evidence } from "./evidence-strip";
 import { SaveIndicator, type SaveState } from "./save-indicator";
 
 export interface DrawerEntry {
@@ -70,6 +71,7 @@ export function EntryDrawer({
   disabled,
 }: Props) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [blocked, setBlocked] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
   const isNew = useRef(!entry.bugTitle && !entry.bugDescription);
 
@@ -85,31 +87,19 @@ export function EntryDrawer({
   const complete = isEntryComplete(entry);
   const missing = missingEntryParts(entry);
 
-  /** A pasted screenshot is evidence, not text — intercept it before it lands. */
-  function onPaste(slot: "BUG" | "TEST") {
-    return async (event: React.ClipboardEvent) => {
-      const file = imageFromPaste(event);
-      if (!file) return;
-
-      event.preventDefault();
-
-      const { addAttachment } = await import("@/app/actions/challenge1");
-      const formData = new FormData();
-      formData.set("file", file);
-
-      const result = await addAttachment(entry.id, slot, formData);
-      if (!result.ok || !result.attachment) {
-        onError(result.error ?? "Could not attach that image.");
-        return;
-      }
-
-      onEvidenceAdded(slot, {
-        id: result.attachment.id,
-        originalFilename: result.attachment.originalFilename,
-        sizeBytes: result.attachment.sizeBytes,
-      });
-    };
-  }
+  /**
+   * The clipboard is closed on all four assessed fields.
+   *
+   * Challenge 1 measures the participant's own manual testing, and a bug report pasted
+   * in from somewhere else is not that. It took the pasted-screenshot shortcut with it
+   * — a paste handler cannot admit images while refusing text without becoming the
+   * thing it is meant to prevent — so the evidence strip gained drag-and-drop to
+   * replace it.
+   *
+   * Worth saying plainly: this stops the casual paste, not a determined one. It is a
+   * speed bump.
+   */
+  const clipboard = noClipboard(() => setBlocked(true));
 
   return (
     <div
@@ -215,6 +205,7 @@ export function EntryDrawer({
                     id={`bug-title-${entry.id}`}
                     ref={titleRef}
                     value={entry.bugTitle}
+                    {...clipboard}
                     onChange={(e) => onChange({ bugTitle: e.target.value })}
                     maxLength={TITLE_MAX}
                     disabled={disabled}
@@ -230,8 +221,8 @@ export function EntryDrawer({
                   <textarea
                     id={`bug-desc-${entry.id}`}
                     value={entry.bugDescription}
+                    {...clipboard}
                     onChange={(e) => onChange({ bugDescription: e.target.value })}
-                    onPaste={onPaste("BUG")}
                     maxLength={DESCRIPTION_MAX}
                     disabled={disabled}
                     rows={8}
@@ -264,6 +255,7 @@ export function EntryDrawer({
                   <input
                     id={`test-title-${entry.id}`}
                     value={entry.testTitle}
+                    {...clipboard}
                     onChange={(e) => onChange({ testTitle: e.target.value })}
                     maxLength={TITLE_MAX}
                     disabled={disabled}
@@ -279,8 +271,8 @@ export function EntryDrawer({
                   <textarea
                     id={`test-desc-${entry.id}`}
                     value={entry.testDescription}
+                    {...clipboard}
                     onChange={(e) => onChange({ testDescription: e.target.value })}
-                    onPaste={onPaste("TEST")}
                     maxLength={DESCRIPTION_MAX}
                     disabled={disabled}
                     rows={8}
@@ -299,6 +291,17 @@ export function EntryDrawer({
                 </div>
               </section>
             </div>
+
+            {/* A blocked paste does nothing visible, and nothing-visible reads as a
+                broken field. Someone who thinks the form is broken spends their time
+                on that instead of on testing, so it says why. */}
+            {blocked && (
+              <p className="border-info/30 bg-info/8 text-info-strong border-t px-4 py-2.5 text-xs">
+                {NO_CLIPBOARD_HINT} Screenshots are still welcome — use{" "}
+                <strong>Attach evidence</strong> or drag an image onto the strip below
+                each box.
+              </p>
+            )}
 
             {/* Said in full where there is room for it, since the pill on the header
                 only has space to say that something is wrong, not what. */}

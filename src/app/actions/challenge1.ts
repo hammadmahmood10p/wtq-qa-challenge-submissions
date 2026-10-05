@@ -1,9 +1,11 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { Challenge1Slot } from "@/generated/prisma/enums";
 import { AttemptClosedError, requireWritableAttempt } from "@/lib/attempt";
 import { requireRole } from "@/lib/auth";
+import { lockChallenge1 } from "@/lib/challenge1-lock";
 import { assertOwnsAttachment, assertOwnsEntry } from "@/lib/challenge1";
 import { DESCRIPTION_MAX, MAX_ENTRIES, TITLE_MAX } from "@/lib/challenge1-limits";
 import { db } from "@/lib/db";
@@ -19,6 +21,8 @@ export interface EntryResult {
   ok: boolean;
   /** Present when the attempt has closed, so the UI can stop offering to save. */
   closed?: boolean;
+  /** Present when Challenge 1 is sealed — the work survives, editing does not. */
+  locked?: boolean;
   error?: string;
   entry?: { id: string; position: number };
   attachment?: {
@@ -55,6 +59,19 @@ async function withWritableAttempt(
 
   try {
     const attempt = await requireWritableAttempt(user.id);
+
+    // The seal is checked here for the same reason the clock is: a disabled interface
+    // is a hint, this is the rule. A tab left open from before the lock, or a replayed
+    // autosave still in flight when Confirm was pressed, must be refused by the server
+    // rather than by whichever screen happens to be in front of the participant.
+    if (attempt.challenge1LockedAt) {
+      return {
+        ok: false,
+        locked: true,
+        error: "Challenge 1 is locked. Ask a super admin if you need it reopened.",
+      };
+    }
+
     return await work({ participantId: user.id, attemptId: attempt.id });
   } catch (error) {
     if (error instanceof AttemptClosedError) {
@@ -260,4 +277,31 @@ export async function removeAttachment(attachmentId: string): Promise<EntryResul
     await storage().delete(attachment.fileKey).catch(() => {});
     return { ok: true };
   });
+}
+
+/**
+ * Seals Challenge 1 and opens the rest.
+ *
+ * Its own action rather than part of the autosave: this is the one irreversible thing
+ * a participant does before submitting, and it should not be reachable by anything
+ * that fires on a timer.
+ */
+export async function lockChallenge1Action(): Promise<EntryResult> {
+  const user = await requireRole("PARTICIPANT");
+
+  try {
+    await requireWritableAttempt(user.id);
+  } catch {
+    return { ok: false, closed: true, error: "Your challenge has ended." };
+  }
+
+  const result = await lockChallenge1(user.id);
+  if (!result.ok) return { ok: false, error: result.message };
+
+  // Every challenge page reads the lock to decide what it may show.
+  revalidatePath("/challenge");
+  revalidatePath("/challenge/run");
+  revalidatePath("/challenge/c1");
+
+  return { ok: true };
 }

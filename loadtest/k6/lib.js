@@ -43,6 +43,34 @@ const params = () => ({
   redirects: 0,
 });
 
+/**
+ * Encodes fields as multipart/form-data.
+ *
+ * k6 sends a plain object as `application/x-www-form-urlencoded`, and the login form
+ * declares `encType="multipart/form-data"`. Next.js answers an urlencoded post to a
+ * Server Action by re-rendering the page: HTTP 200, no error message, no session
+ * cookie, nothing in the logs. The request looks like a success and authenticates
+ * nobody — which is exactly what the first smoke test reported, and why it reported it
+ * as "logins failed" rather than as anything diagnosable.
+ *
+ * Written out by hand rather than pulled from k6's jslib, which is fetched over the
+ * network at run time: a load test that cannot start because a proxy blocked a helper
+ * download is a bad evening.
+ */
+function multipart(fields) {
+  const boundary = "----k6wtq" + Math.random().toString(16).slice(2);
+
+  let payload = "";
+  for (const [key, value] of Object.entries(fields)) {
+    payload += `--${boundary}\r\n`;
+    payload += `Content-Disposition: form-data; name="${key}"\r\n\r\n`;
+    payload += `${value}\r\n`;
+  }
+  payload += `--${boundary}--\r\n`;
+
+  return { payload, contentType: `multipart/form-data; boundary=${boundary}` };
+}
+
 /** Pulls one hidden input's value out of the server-rendered form. */
 function hiddenField(html, name) {
   // The name contains `$` and `:`, both regex metacharacters, so it is escaped rather
@@ -66,6 +94,10 @@ function hiddenField(html, name) {
  */
 export function login(username, password) {
   const jar = http.cookieJar();
+
+  // Each iteration signs in fresh. Without this the VU carries its previous session
+  // into the next login, which both skews the measurement and hides failures.
+  jar.clear(`${BASE_URL}/`);
 
   const page = http.get(`${BASE_URL}/login`, {
     ...params(),
@@ -95,9 +127,14 @@ export function login(username, password) {
     );
   }
 
+  // Built once: calling the encoder twice would generate two different boundaries,
+  // and the header would describe a payload that does not exist.
+  const form = multipart(body);
+
   const started = Date.now();
-  const response = http.post(`${BASE_URL}/login`, body, {
+  const response = http.post(`${BASE_URL}/login`, form.payload, {
     ...params(),
+    headers: { "Content-Type": form.contentType },
     tags: { name: "POST /login" },
   });
   loginDuration.add(Date.now() - started);
@@ -113,9 +150,10 @@ export function login(username, password) {
     return null;
   }
 
-  // A successful sign-in redirects; the session cookie is what proves it.
-  const cookies = jar.cookiesForURL(`${BASE_URL}/`);
-  const authenticated = Boolean(cookies && Object.keys(cookies).length > 0);
+  // The session cookie *on this response* is what proves it — not whatever is in the
+  // jar. A VU's jar persists across its iterations, so a failed sign-in after a
+  // successful one would still find a cookie sitting there and count itself a success.
+  const authenticated = Boolean(response.cookies && response.cookies.wtq_session);
 
   check(response, {
     "login did not error": (r) => r.status < 500,

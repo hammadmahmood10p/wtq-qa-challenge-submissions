@@ -38,7 +38,11 @@ export default async function ChallengeRunPage() {
       </ChallengeHeader>
 
       <main className="app-gutter pb-16">
-        <ChallengeTabs chosenTrack={attempt.chosenTrack} />
+        <ChallengeTabs
+          chosenTrack={attempt.chosenTrack}
+          challenge1Locked={attempt.challenge1EverLocked}
+          reopenedForChallenge1={attempt.reopenedForChallenge1}
+        />
       </main>
     </>
   );

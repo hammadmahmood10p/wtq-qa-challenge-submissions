@@ -29,12 +29,33 @@ export interface RateLimitResult {
  * credential-stuffing defence is the per-account limit below, which an attacker
  * cannot dilute by spreading attempts across addresses.
  *
- * These numbers are a judgement, not a measurement — revisit them against the Day 12
- * load test, which is the first time we will see real concurrency.
+ * These numbers were a judgement until the load test of 2 October 2026, which measured
+ * them. See the note on loginPerIp.
  */
 export const LIMITS = {
   signupPerIp: { limit: 300, windowSeconds: 600 },
-  loginPerIp: { limit: 300, windowSeconds: 300 },
+
+  /**
+   * Raised from 300 after the load test refused seven sign-ins in ten.
+   *
+   * The test ran 500 virtual participants from one address — the same shape as a venue
+   * behind NAT — and successful sign-ins pinned at exactly 300 from the 200-user tier
+   * upwards. At 500 users, 712 of 1012 attempts were turned away. On the day that is
+   * most of a venue being told to wait during the ten minutes when everyone arrives.
+   *
+   * 2000 is sized for the worst case nobody has ruled out: all three cities sharing
+   * one corporate egress address, so 500 participants, their retries, and the judges
+   * all drawing on one budget. If IT confirms each venue has its own address the
+   * number could come down, but there is no benefit in it being tighter.
+   *
+   * What this does *not* weaken is the defence that matters. Per-IP is a crude ceiling
+   * against a flood; credential stuffing is stopped by the per-account limit below,
+   * which an attacker cannot dilute by spreading attempts across addresses — and with
+   * only ~500 accounts in existence, a 300-request budget was never the thing standing
+   * between an attacker and all of them.
+   */
+  loginPerIp: { limit: 2000, windowSeconds: 300 },
+
   /** Per person, not per typed string — see accountRateLimitKey. */
   loginPerAccount: { limit: 10, windowSeconds: 300 },
 } as const;
