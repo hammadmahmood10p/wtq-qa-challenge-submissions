@@ -64,12 +64,11 @@ export function ChallengePageChrome({
       <ChallengeHeader initialRemainingMs={remainingMs} totalMs={totalMs}>
         <SubmitButton progress={progress} />
       </ChallengeHeader>
+      {/* Once, at the top. A second copy at the foot was there for the scroll, but two
+          identical controls on one page read as two different destinations. */}
       <main className="app-gutter space-y-8 py-8">
         <BackToChallenges />
         {children}
-        {/* Again at the foot, because Challenge 1 can run to dozens of findings and
-            nobody should have to scroll back up to leave the page. */}
-        <BackToChallenges />
       </main>
     </>
   );
