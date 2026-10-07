@@ -99,6 +99,7 @@ export function AddPersonDialog({ kind }: { kind: keyof typeof ACTIONS }) {
                 <Input
                   id={id}
                   name="idCardNumber"
+                  defaultValue={state.values?.idCardNumber}
                   inputMode="numeric"
                   placeholder="42101-1234567-8"
                   required={required}
@@ -114,6 +115,7 @@ export function AddPersonDialog({ kind }: { kind: keyof typeof ACTIONS }) {
               <Input
                 id={id}
                 name="fullName"
+                defaultValue={state.values?.fullName}
                 placeholder="Their full name"
                 required={required}
                 aria-describedby={describedBy}
@@ -132,6 +134,7 @@ export function AddPersonDialog({ kind }: { kind: keyof typeof ACTIONS }) {
               <Input
                 id={id}
                 name="email"
+                defaultValue={state.values?.email}
                 type="email"
                 placeholder={
                   kind === "participant" ? "them@example.com" : `them${JUDGE_EMAIL_DOMAIN}`
@@ -150,6 +153,7 @@ export function AddPersonDialog({ kind }: { kind: keyof typeof ACTIONS }) {
                   <Input
                     id={id}
                     name="phone"
+                    defaultValue={state.values?.phone}
                     type="tel"
                     placeholder="0300-1234567"
                     required={required}

@@ -15,6 +15,43 @@ export interface SignupState {
   errors?: Record<string, string>;
   /** Whole-form message, for anything not attributable to one field. */
   message?: string;
+  /**
+   * What they typed, handed back so a refused submission does not empty the form.
+   *
+   * React resets a `<form action={…}>` once the action returns, which empties every
+   * uncontrolled field — so a mistyped phone number was costing someone their ID card
+   * number, name and email as well. The fields read these back as their defaultValue,
+   * which is what the reset then restores them to.
+   *
+   * Passwords are deliberately absent. They are controlled inputs and survive the
+   * reset on their own, and sending a password back down the wire to sit in the page's
+   * state is not a thing to do for convenience.
+   */
+  values?: SignupValues;
+}
+
+/** The non-secret fields of a signup form. */
+export interface SignupValues {
+  idCardNumber?: string;
+  fullName?: string;
+  email?: string;
+  phone?: string;
+}
+
+function submitted(formData: FormData): SignupValues {
+  const read = (key: string) => {
+    const value = formData.get(key);
+    return typeof value === "string" ? value : undefined;
+  };
+
+  // Location is not here: it is a controlled radio group, so its selection already
+  // survives the reset.
+  return {
+    idCardNumber: read("idCardNumber"),
+    fullName: read("fullName"),
+    email: read("email"),
+    phone: read("phone"),
+  };
 }
 
 /**
@@ -65,6 +102,7 @@ export async function signUpParticipant(
   if (!limit.allowed) {
     return {
       ok: false,
+      values: submitted(formData),
       message: `Too many signup attempts. Please try again in ${Math.ceil(limit.retryAfterSeconds / 60)} minute(s).`,
     };
   }
@@ -79,7 +117,9 @@ export async function signUpParticipant(
     confirmPassword: formData.get("confirmPassword"),
   });
 
-  if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
+  if (!parsed.success) {
+    return { ok: false, errors: fieldErrors(parsed.error), values: submitted(formData) };
+  }
 
   const data = parsed.data;
 
@@ -121,14 +161,22 @@ export async function signUpParticipant(
     created = true;
   } catch (error) {
     const conflict = uniqueViolation(error);
-    if (conflict) return { ok: false, errors: conflict };
+    if (conflict) return { ok: false, errors: conflict, values: submitted(formData) };
 
     console.error("[signup:participant]", error);
-    return { ok: false, message: "Something went wrong creating your account. Please try again." };
+    return {
+      ok: false,
+      values: submitted(formData),
+      message: "Something went wrong creating your account. Please try again.",
+    };
   }
 
   if (created) redirect("/login?registered=participant");
-  return { ok: false, message: "Something went wrong. Please try again." };
+  return {
+    ok: false,
+    values: submitted(formData),
+    message: "Something went wrong. Please try again.",
+  };
 }
 
 export async function signUpJudge(_prev: SignupState, formData: FormData): Promise<SignupState> {
@@ -136,6 +184,7 @@ export async function signUpJudge(_prev: SignupState, formData: FormData): Promi
   if (!limit.allowed) {
     return {
       ok: false,
+      values: submitted(formData),
       message: `Too many signup attempts. Please try again in ${Math.ceil(limit.retryAfterSeconds / 60)} minute(s).`,
     };
   }
@@ -147,7 +196,9 @@ export async function signUpJudge(_prev: SignupState, formData: FormData): Promi
     confirmPassword: formData.get("confirmPassword"),
   });
 
-  if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
+  if (!parsed.success) {
+    return { ok: false, errors: fieldErrors(parsed.error), values: submitted(formData) };
+  }
 
   const data = parsed.data;
   let created = false;
@@ -177,12 +228,20 @@ export async function signUpJudge(_prev: SignupState, formData: FormData): Promi
     created = true;
   } catch (error) {
     const conflict = uniqueViolation(error);
-    if (conflict) return { ok: false, errors: conflict };
+    if (conflict) return { ok: false, errors: conflict, values: submitted(formData) };
 
     console.error("[signup:judge]", error);
-    return { ok: false, message: "Something went wrong creating your account. Please try again." };
+    return {
+      ok: false,
+      values: submitted(formData),
+      message: "Something went wrong creating your account. Please try again.",
+    };
   }
 
   if (created) redirect("/signup/judge/pending");
-  return { ok: false, message: "Something went wrong. Please try again." };
+  return {
+    ok: false,
+    values: submitted(formData),
+    message: "Something went wrong. Please try again.",
+  };
 }

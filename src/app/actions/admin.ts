@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { SignupValues } from "@/app/actions/signup";
 import { reopenAttempt, resetAttempt } from "@/lib/attempt-admin";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth";
@@ -11,10 +12,7 @@ import { hashPassword } from "@/lib/password";
 import { signupConflictField } from "@/lib/prisma-errors";
 import { LAST_ADMIN_MESSAGE, wouldStrandTheEvent } from "@/lib/last-admin";
 import { revokeAllSessions } from "@/lib/session";
-import {
-  PARTICIPANT_LOGINS_DISABLED,
-  setParticipantLoginsDisabled,
-} from "@/lib/settings";
+import { PARTICIPANT_LOGINS_DISABLED, setParticipantLoginsDisabled } from "@/lib/settings";
 import { formatTempPassword, generateTempPassword } from "@/lib/temp-password";
 import {
   adminCreateJudgeSchema,
@@ -31,6 +29,29 @@ export interface AdminState {
    * closing the dialog — there is no email service to fall back on.
    */
   tempPassword?: string;
+  /**
+   * What the admin typed, handed back so a refused Add dialog does not empty itself.
+   *
+   * React resets a `<form action={…}>` once the action returns, which clears every
+   * uncontrolled field — so one mistyped digit in a CNIC was costing the name, email
+   * and phone number as well. Same fix, and same reasoning, as the signup form.
+   */
+  values?: SignupValues;
+}
+
+function submitted(formData: FormData): SignupValues {
+  const read = (key: string) => {
+    const value = formData.get(key);
+    return typeof value === "string" ? value : undefined;
+  };
+
+  // Location is a controlled radio group, so its selection survives on its own.
+  return {
+    idCardNumber: read("idCardNumber"),
+    fullName: read("fullName"),
+    email: read("email"),
+    phone: read("phone"),
+  };
 }
 
 function fieldErrors(error: { issues: { path: PropertyKey[]; message: string }[] }) {
@@ -79,7 +100,7 @@ export async function adminCreateParticipant(
     location: formData.get("location"),
   });
 
-  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+  if (!parsed.success) return { errors: fieldErrors(parsed.error), values: submitted(formData) };
 
   const data = parsed.data;
   const tempPassword = generateTempPassword();
@@ -115,20 +136,20 @@ export async function adminCreateParticipant(
     });
   } catch (error) {
     const conflict = conflictErrors(error);
-    if (conflict) return { errors: conflict };
+    if (conflict) return { errors: conflict, values: submitted(formData) };
 
     console.error("[admin:createParticipant]", error);
-    return { message: "Could not create the participant. Please try again." };
+    return {
+      message: "Could not create the participant. Please try again.",
+      values: submitted(formData),
+    };
   }
 
   refresh();
   return { ok: true, tempPassword: formatTempPassword(tempPassword) };
 }
 
-export async function adminCreateJudge(
-  _prev: AdminState,
-  formData: FormData,
-): Promise<AdminState> {
+export async function adminCreateJudge(_prev: AdminState, formData: FormData): Promise<AdminState> {
   const admin = await requireRole("SUPER_ADMIN");
 
   const parsed = adminCreateJudgeSchema.safeParse({
@@ -136,7 +157,7 @@ export async function adminCreateJudge(
     fullName: formData.get("fullName"),
   });
 
-  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+  if (!parsed.success) return { errors: fieldErrors(parsed.error), values: submitted(formData) };
 
   const data = parsed.data;
   const tempPassword = generateTempPassword();
@@ -167,10 +188,13 @@ export async function adminCreateJudge(
     });
   } catch (error) {
     const conflict = conflictErrors(error);
-    if (conflict) return { errors: conflict };
+    if (conflict) return { errors: conflict, values: submitted(formData) };
 
     console.error("[admin:createJudge]", error);
-    return { message: "Could not create the judge. Please try again." };
+    return {
+      message: "Could not create the judge. Please try again.",
+      values: submitted(formData),
+    };
   }
 
   refresh();
@@ -521,7 +545,7 @@ export async function adminCreateSuperAdmin(
     fullName: formData.get("fullName"),
   });
 
-  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+  if (!parsed.success) return { errors: fieldErrors(parsed.error), values: submitted(formData) };
 
   const data = parsed.data;
   const tempPassword = generateTempPassword();
@@ -549,10 +573,13 @@ export async function adminCreateSuperAdmin(
     });
   } catch (error) {
     const conflict = conflictErrors(error);
-    if (conflict) return { errors: conflict };
+    if (conflict) return { errors: conflict, values: submitted(formData) };
 
     console.error("[admin:createSuperAdmin]", error);
-    return { message: "Could not create the super admin. Please try again." };
+    return {
+      message: "Could not create the super admin. Please try again.",
+      values: submitted(formData),
+    };
   }
 
   refresh();

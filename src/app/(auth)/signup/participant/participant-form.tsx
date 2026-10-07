@@ -21,8 +21,12 @@ export function ParticipantForm() {
   const [state, formAction, pending] = useActionState(signUpParticipant, INITIAL);
 
   // Controlled only where a component needs the value: the radio group and the two
-  // password fields. Everything else stays uncontrolled so the browser keeps what was
-  // typed when a server-side error comes back.
+  // password fields.
+  //
+  // The rest are uncontrolled, and get their value back from the action rather than
+  // from the browser. React resets the form once the action returns, which emptied
+  // every one of them — so a mistyped phone number was costing someone their ID card
+  // number, name and email too. defaultValue is what the reset restores them to.
   const [location, setLocation] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -44,6 +48,7 @@ export function ParticipantForm() {
           <Input
             id={id}
             name="idCardNumber"
+            defaultValue={state.values?.idCardNumber}
             inputMode="numeric"
             autoComplete="off"
             placeholder="42101-1234567-8"
@@ -59,6 +64,7 @@ export function ParticipantForm() {
           <Input
             id={id}
             name="fullName"
+            defaultValue={state.values?.fullName}
             autoComplete="name"
             placeholder="Your full name"
             required={required}
@@ -78,6 +84,7 @@ export function ParticipantForm() {
           <Input
             id={id}
             name="email"
+            defaultValue={state.values?.email}
             type="email"
             autoComplete="email"
             placeholder="you@example.com"
@@ -98,6 +105,7 @@ export function ParticipantForm() {
           <Input
             id={id}
             name="phone"
+            defaultValue={state.values?.phone}
             type="tel"
             autoComplete="tel"
             placeholder="0300-1234567"
