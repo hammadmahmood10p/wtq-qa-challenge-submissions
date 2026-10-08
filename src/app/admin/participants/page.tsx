@@ -45,6 +45,8 @@ export default async function ParticipantsPage({
     q: typeof raw.q === "string" ? raw.q : undefined,
     status: typeof raw.status === "string" ? raw.status : undefined,
     location: typeof raw.location === "string" ? raw.location : undefined,
+    sort: typeof raw.sort === "string" ? raw.sort : undefined,
+    dir: typeof raw.dir === "string" ? raw.dir : undefined,
     page: typeof raw.page === "string" ? raw.page : undefined,
   });
 

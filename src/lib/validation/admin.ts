@@ -51,11 +51,12 @@ export const rosterQuerySchema = z.object({
   q: z.string().trim().max(120).optional(),
   status: z
     .enum(["ALL", "ACTIVE", "BLOCKED", "SUBMITTED_LOCKED", "REMOVED", "PENDING_APPROVAL"])
+    .catch("ALL")
     .default("ALL"),
-  location: z.enum(["ALL", "KARACHI", "LAHORE", "ISLAMABAD"]).default("ALL"),
+  location: z.enum(["ALL", "KARACHI", "LAHORE", "ISLAMABAD"]).catch("ALL").default("ALL"),
   sort: z.enum(["default", "name", "location", "status"]).catch("default").default("default"),
   dir: z.enum(["asc", "desc"]).catch("asc").default("asc"),
-  page: z.coerce.number().int().min(1).default(1),
+  page: z.coerce.number().int().min(1).catch(1).default(1),
 });
 
 export type RosterQuery = z.infer<typeof rosterQuerySchema>;
