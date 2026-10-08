@@ -8,6 +8,7 @@ import { RosterFilters } from "@/components/admin/roster-filters";
 import { RowActions } from "@/components/admin/row-actions";
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/badge";
+import { SortableHeader } from "@/components/ui/sortable-header";
 import { EmptyRow, TableShell, Td, Th, Thead, Tr } from "@/components/ui/table";
 import { requireRole } from "@/lib/auth";
 import { listJudges, rosterCounts } from "@/lib/roster";
@@ -63,7 +64,10 @@ export default async function JudgesPage({
       {/* Requirement 7: judges cannot log in until approved, so an unattended queue
           means judges sitting idle on the day. Surfaced rather than left to a filter. */}
       {counts.judgesPending > 0 && (
-        <Alert variant="warning" title={`${counts.judgesPending} judge account(s) awaiting approval`}>
+        <Alert
+          variant="warning"
+          title={`${counts.judgesPending} judge account(s) awaiting approval`}
+        >
           They cannot log in until you approve them.
         </Alert>
       )}
@@ -71,47 +75,47 @@ export default async function JudgesPage({
       <RosterFilters statuses={STATUSES} searchHint="Search matches name and email." />
 
       <PasswordReveal count={rows.filter((r) => r.derivedPassword).length}>
-      <TableShell>
-        <Thead>
-          <Tr>
-            <Th>Full name</Th>
-            <Th>Email</Th>
-            <Th>Status</Th>
-            <Th>Approved</Th>
-            <Th>Password</Th>
-            <Th className="text-right">Actions</Th>
-          </Tr>
-        </Thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <EmptyRow colSpan={6}>No judges match these filters.</EmptyRow>
-          ) : (
-            rows.map((row) => (
-              <Tr key={row.id}>
-                <Td className="font-medium">{row.fullName}</Td>
-                <Td className="text-xs">{row.email}</Td>
-                <Td>
-                  <StatusBadge status={row.status} />
-                </Td>
-                <Td className="text-muted text-xs whitespace-nowrap">
-                  {row.approvedAt ? dateFormat.format(row.approvedAt) : "—"}
-                </Td>
-                <Td>
-                  <PasswordCell value={row.derivedPassword ?? null} />
-                </Td>
-                <Td>
-                  <RowActions
-                    userId={row.id}
-                    fullName={row.fullName}
-                    status={row.status}
-                    kind="judge"
-                  />
-                </Td>
-              </Tr>
-            ))
-          )}
-        </tbody>
-      </TableShell>
+        <TableShell>
+          <Thead>
+            <Tr>
+              <SortableHeader column="name">Full name</SortableHeader>
+              <Th>Email</Th>
+              <SortableHeader column="status">Status</SortableHeader>
+              <Th>Approved</Th>
+              <Th>Password</Th>
+              <Th className="text-right">Actions</Th>
+            </Tr>
+          </Thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <EmptyRow colSpan={6}>No judges match these filters.</EmptyRow>
+            ) : (
+              rows.map((row) => (
+                <Tr key={row.id}>
+                  <Td className="font-medium">{row.fullName}</Td>
+                  <Td className="text-xs">{row.email}</Td>
+                  <Td>
+                    <StatusBadge status={row.status} />
+                  </Td>
+                  <Td className="text-muted text-xs whitespace-nowrap">
+                    {row.approvedAt ? dateFormat.format(row.approvedAt) : "—"}
+                  </Td>
+                  <Td>
+                    <PasswordCell value={row.derivedPassword ?? null} />
+                  </Td>
+                  <Td>
+                    <RowActions
+                      userId={row.id}
+                      fullName={row.fullName}
+                      status={row.status}
+                      kind="judge"
+                    />
+                  </Td>
+                </Tr>
+              ))
+            )}
+          </tbody>
+        </TableShell>
       </PasswordReveal>
 
       <Pagination page={query.page} pageCount={pageCount} total={total} noun="judges" />
