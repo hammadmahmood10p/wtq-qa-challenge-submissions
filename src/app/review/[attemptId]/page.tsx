@@ -5,6 +5,8 @@ import type { Metadata } from "next";
 import type { ChallengeKey } from "@/generated/prisma/enums";
 import { Challenge1ReadOnly } from "@/components/challenge/challenge1-readonly";
 import { Challenge1Criteria } from "@/components/review/challenge1-criteria";
+import { ChallengeBrief } from "@/components/challenge/challenge-brief";
+import { WhatToReview } from "@/components/review/what-to-review";
 import {
   Challenge2ReadOnly,
   Challenge3ReadOnly,
@@ -127,6 +129,18 @@ export default async function ReviewPage({ params }: { params: Promise<{ attempt
       applicable,
       content: (
         <>
+          {/* The brief this participant was working to, one click away. Rendered here
+              on the server and handed to the dialog as children, so the judge reads
+              exactly the text the participant read — the same source, not a second
+              copy that would drift from it.
+
+              `chosenTrack` is deliberately null: the participant-facing copy would
+              otherwise tell the judge that a challenge is "closed to you", which is
+              true of the participant and nonsense here. */}
+          <WhatToReview challengeNumber={challenge.number}>
+            <ChallengeBrief challenge={challenge} chosenTrack={null} />
+          </WhatToReview>
+
           {/* Above the submission, not below it: the score is why the judge is here,
               and Challenge 1 can run to dozens of findings. */}
           {evaluation && <ChallengeScoreCard challenge={challenge.id} />}
