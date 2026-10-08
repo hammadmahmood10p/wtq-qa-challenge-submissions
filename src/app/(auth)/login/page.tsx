@@ -33,7 +33,11 @@ export default async function LoginPage({
       {loggedOut === "1" && <Alert variant="info">You have been logged out.</Alert>}
 
       <div>
-        <h1 className="font-display text-xl font-bold">Welcome back</h1>
+        {/* Not "Welcome back". Almost everyone who reaches this page does so for the
+            first time, on the morning of the event, with credentials they have never
+            used — greeting them as a returning visitor is the first thing the product
+            would say to them, and it would be wrong. */}
+        <h1 className="font-display text-xl font-bold">Welcome to Women Tech Quest</h1>
         <p className="text-muted mt-1.5 text-sm">Log in to continue to the QA challenges.</p>
       </div>
 
