@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { getSetting, setSetting } from "@/lib/settings";
+import type { ReportKind } from "@/lib/report-upload";
 
 /**
  * The two things the organisers supply late: the application participants test, and
@@ -28,6 +29,12 @@ export const KNOWN_BUGS_KEY = "known_bugs_pdf_key";
 export const KNOWN_BUGS_FILENAME = "known_bugs_pdf_filename";
 export const KNOWN_BUGS_SIZE = "known_bugs_pdf_size";
 export const KNOWN_BUGS_UPLOADED_AT = "known_bugs_pdf_uploaded_at";
+
+export const AI_EVAL_KEY = "ai_evaluation_key";
+export const AI_EVAL_FILENAME = "ai_evaluation_filename";
+export const AI_EVAL_SIZE = "ai_evaluation_size";
+export const AI_EVAL_KIND = "ai_evaluation_kind";
+export const AI_EVAL_UPLOADED_AT = "ai_evaluation_uploaded_at";
 
 /** The address participants open to do Challenge 1 and 2. Null until it is set. */
 export const getApplicationUrl = cache(async (): Promise<string | null> => {
@@ -108,8 +115,24 @@ export interface KnownBugsPdf {
  * Note that this is not "any signed-in user", which is what the Challenge 4 CSV uses.
  * That file is for participants; this one is the answer key.
  */
-export function canReadKnownBugs(role: string | null | undefined): boolean {
+export function canReadJudgeOnlyFile(role: string | null | undefined): boolean {
   return role === "JUDGE" || role === "SUPER_ADMIN";
+}
+
+/** The seeded-defect list. Named for its own route, so the rule reads at the call site. */
+export function canReadKnownBugs(role: string | null | undefined): boolean {
+  return canReadJudgeOnlyFile(role);
+}
+
+/**
+ * The AI evaluation report. Same audience, same reasoning.
+ *
+ * It describes how participants' submissions scored against an automated assessment,
+ * which is material a participant must not see while the event is running and has no
+ * business seeing afterwards either.
+ */
+export function canReadAiEvaluation(role: string | null | undefined): boolean {
+  return canReadJudgeOnlyFile(role);
 }
 
 /**
@@ -160,6 +183,72 @@ export async function setKnownBugsPdf(pdf: KnownBugsPdf | null): Promise<void> {
     setSetting(KNOWN_BUGS_FILENAME, pdf.filename),
     setSetting(KNOWN_BUGS_SIZE, String(pdf.sizeBytes)),
     setSetting(KNOWN_BUGS_UPLOADED_AT, (pdf.uploadedAt ?? new Date()).toISOString()),
+  ]);
+}
+
+export interface AiEvaluationReport {
+  key: string;
+  filename: string;
+  sizeBytes: number;
+  /** Decides how the file is served: a PDF inline, a web page sandboxed. */
+  kind: ReportKind;
+  uploadedAt: Date | null;
+}
+
+/**
+ * The automated assessment of the Challenge 2 and 3 reports.
+ *
+ * The organisers run the exported submissions through a separate tool and upload what
+ * it produces — a PDF or a web page — for judges to read beside the work itself. Same
+ * audience as the seeded-defect list, and the same reason: it says how a submission
+ * scored, which is not a participant's to see.
+ *
+ * `kind` is stored rather than inferred at serving time. The bytes were already
+ * examined once on upload, and re-sniffing on every request would mean the answer
+ * could differ between the two.
+ */
+export const getAiEvaluationReport = cache(async (): Promise<AiEvaluationReport | null> => {
+  const [key, filename, size, kind, uploadedAt] = await Promise.all([
+    getSetting(AI_EVAL_KEY),
+    getSetting(AI_EVAL_FILENAME),
+    getSetting(AI_EVAL_SIZE),
+    getSetting(AI_EVAL_KIND),
+    getSetting(AI_EVAL_UPLOADED_AT),
+  ]);
+
+  if (!key?.trim()) return null;
+
+  const parsedDate = uploadedAt ? new Date(uploadedAt) : null;
+
+  return {
+    key: key.trim(),
+    filename: filename?.trim() || "ai-evaluation.pdf",
+    sizeBytes: Number(size) || 0,
+    // Defaults to pdf: a stored value that is neither must not become "serve this as
+    // a web page", which is the one of the two that can run anything.
+    kind: kind === "html" ? "html" : "pdf",
+    uploadedAt: parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : null,
+  };
+});
+
+export async function setAiEvaluationReport(report: AiEvaluationReport | null): Promise<void> {
+  if (!report) {
+    await Promise.all([
+      setSetting(AI_EVAL_KEY, ""),
+      setSetting(AI_EVAL_FILENAME, ""),
+      setSetting(AI_EVAL_SIZE, ""),
+      setSetting(AI_EVAL_KIND, ""),
+      setSetting(AI_EVAL_UPLOADED_AT, ""),
+    ]);
+    return;
+  }
+
+  await Promise.all([
+    setSetting(AI_EVAL_KEY, report.key),
+    setSetting(AI_EVAL_FILENAME, report.filename),
+    setSetting(AI_EVAL_SIZE, String(report.sizeBytes)),
+    setSetting(AI_EVAL_KIND, report.kind),
+    setSetting(AI_EVAL_UPLOADED_AT, (report.uploadedAt ?? new Date()).toISOString()),
   ]);
 }
 

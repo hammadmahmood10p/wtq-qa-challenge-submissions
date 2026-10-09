@@ -6,15 +6,18 @@ import {
   ExternalLink,
   FileSpreadsheet,
   Globe,
+  Sparkles,
   Trash2,
   Upload,
 } from "lucide-react";
 import { useActionState, useRef, useState, useTransition } from "react";
 import {
   adminClearApplicationUrl,
+  adminRemoveAiEvaluation,
   adminRemoveChallenge4Csv,
   adminRemoveKnownBugsPdf,
   adminSetApplicationUrl,
+  adminUploadAiEvaluation,
   adminUploadChallenge4Csv,
   adminUploadKnownBugsPdf,
   type EventConfigState,
@@ -23,7 +26,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { inputClasses } from "@/components/ui/field";
-import type { Challenge4Csv, KnownBugsPdf } from "@/lib/event-config";
+import type { AiEvaluationReport, Challenge4Csv, KnownBugsPdf } from "@/lib/event-config";
 
 /**
  * The two things the organisers hand over late, editable while the event is running.
@@ -37,10 +40,12 @@ export function EventConfig({
   applicationUrl,
   csv,
   knownBugs,
+  aiEvaluation,
 }: {
   applicationUrl: string | null;
   csv: Challenge4Csv | null;
   knownBugs: KnownBugsPdf | null;
+  aiEvaluation: AiEvaluationReport | null;
 }) {
   return (
     <section className="space-y-3">
@@ -56,6 +61,7 @@ export function EventConfig({
         <ApplicationUrlCard applicationUrl={applicationUrl} />
         <CsvCard csv={csv} />
         <KnownBugsCard pdf={knownBugs} />
+        <AiEvaluationCard report={aiEvaluation} />
       </div>
     </section>
   );
@@ -462,6 +468,137 @@ function KnownBugsCard({ pdf }: { pdf: KnownBugsPdf | null }) {
             </Button>
             <Button variant="danger" onClick={remove} loading={removing}>
               Remove PDF
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+    </Card>
+  );
+}
+
+/**
+ * The automated assessment of the Challenge 2 and 3 reports.
+ *
+ * Takes a PDF or a web page, because the tool that produces it does one or the other.
+ * The card says which kind landed, since that is the one thing an administrator cannot
+ * tell from the filename — the extension is corrected to match the actual contents on
+ * upload, so a mislabelled file is quietly fixed rather than quietly trusted.
+ */
+function AiEvaluationCard({ report }: { report: AiEvaluationReport | null }) {
+  const [state, formAction, uploading] = useActionState(adminUploadAiEvaluation, {});
+  const [removing, startRemoving] = useTransition();
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [removeState, setRemoveState] = useState<EventConfigState | null>(null);
+
+  function remove() {
+    startRemoving(async () => {
+      setRemoveState(await adminRemoveAiEvaluation());
+      setConfirmingRemove(false);
+    });
+  }
+
+  const notice = state.message ? state : removeState;
+
+  return (
+    <Card
+      icon={<Sparkles size={15} className="text-violet" />}
+      title="AI evaluation report"
+      ready={Boolean(report)}
+    >
+      <p className="text-muted text-xs">
+        What the automated assessment produced from the exported Challenge 2 and 3 reports. Judges
+        open it from either of those review tabs. A PDF or an HTML file — both are accepted.
+      </p>
+
+      <Alert variant="warning">
+        <span className="text-xs">
+          Judges and super admins only. Participants cannot reach this file, by role rather than by
+          not being shown a link.
+        </span>
+      </Alert>
+
+      {report && (
+        <div className="border-border bg-surface-raised rounded-(--radius-control) border p-3">
+          <p className="truncate font-mono text-xs font-medium">{report.filename}</p>
+          <p className="text-muted mt-1 text-xs">
+            {report.kind === "html" ? "Web page" : "PDF"} · {formatBytes(report.sizeBytes)}
+            {report.uploadedAt
+              ? ` · uploaded ${report.uploadedAt.toLocaleString("en-GB", {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}`
+              : ""}
+          </p>
+          <a
+            href="/api/files/ai-evaluation"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-violet mt-2 inline-block text-xs font-medium hover:underline"
+          >
+            Open what judges see
+          </a>
+        </div>
+      )}
+
+      <form action={formAction} className="space-y-2">
+        <label htmlFor="ai-eval-file" className="block text-sm font-medium">
+          {report ? "Replace with" : "Choose a file"}
+        </label>
+        <input
+          id="ai-eval-file"
+          name="file"
+          type="file"
+          accept="application/pdf,.pdf,text/html,.html,.htm"
+          required
+          className="text-muted file:border-border file:bg-surface-raised file:text-text hover:file:border-violet/40 block w-full text-xs file:mr-3 file:cursor-pointer file:rounded-(--radius-control) file:border file:px-3 file:py-1.5 file:text-xs file:font-medium"
+        />
+
+        {notice?.message && (
+          <Alert variant={notice.ok ? "success" : "error"}>{notice.message}</Alert>
+        )}
+
+        <div className="flex flex-wrap justify-end gap-2">
+          {report && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmingRemove(true)}
+              disabled={uploading || removing}
+              className="hover:text-danger-strong"
+            >
+              <Trash2 size={14} />
+              Remove
+            </Button>
+          )}
+          <Button type="submit" size="sm" loading={uploading}>
+            <Upload size={14} />
+            {report ? "Replace report" : "Upload report"}
+          </Button>
+        </div>
+      </form>
+
+      <Dialog
+        open={confirmingRemove}
+        onClose={() => setConfirmingRemove(false)}
+        title="Remove the AI evaluation report?"
+      >
+        <div className="space-y-4">
+          <p className="text-muted text-sm">
+            Judges will no longer see the &ldquo;View AI Evaluation&rdquo; button on the Challenge 2
+            and 3 review tabs, and the file will be deleted from storage. Scores already given are
+            unaffected.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmingRemove(false)}
+              disabled={removing}
+            >
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={remove} loading={removing}>
+              Remove report
             </Button>
           </div>
         </div>

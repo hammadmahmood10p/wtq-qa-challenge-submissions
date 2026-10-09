@@ -199,6 +199,16 @@ const DESCRIPTORS: Record<AuditAction, AuditDescriptor> = {
     category: "Event settings",
     tone: "warning",
   },
+  "admin.ai_evaluation_uploaded": {
+    label: "Uploaded the AI evaluation report",
+    category: "Event settings",
+    tone: "info",
+  },
+  "admin.ai_evaluation_removed": {
+    label: "Removed the AI evaluation report",
+    category: "Event settings",
+    tone: "warning",
+  },
 
   // --- Security -------------------------------------------------------------
   "admin.master_password_set": {

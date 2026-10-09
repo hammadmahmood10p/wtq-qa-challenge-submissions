@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { canReadKnownBugs, normaliseApplicationUrl } from "./event-config";
+import {
+  canReadAiEvaluation,
+  canReadJudgeOnlyFile,
+  canReadKnownBugs,
+  normaliseApplicationUrl,
+} from "./event-config";
 
 describe("normaliseApplicationUrl", () => {
   it("keeps a full https address", () => {
@@ -76,5 +81,34 @@ describe("canReadKnownBugs", () => {
     expect(canReadKnownBugs("")).toBe(false);
     expect(canReadKnownBugs("OBSERVER")).toBe(false);
     expect(canReadKnownBugs("judge")).toBe(false);
+  });
+});
+
+describe("canReadAiEvaluation", () => {
+  it("lets judges and super admins read it", () => {
+    expect(canReadAiEvaluation("JUDGE")).toBe(true);
+    expect(canReadAiEvaluation("SUPER_ADMIN")).toBe(true);
+  });
+
+  it("never lets a participant read it", () => {
+    // It says how submissions scored. Not a participant's to see during the event, and
+    // not afterwards either.
+    expect(canReadAiEvaluation("PARTICIPANT")).toBe(false);
+  });
+
+  it("refuses anyone not signed in, and any role it does not recognise", () => {
+    expect(canReadAiEvaluation(null)).toBe(false);
+    expect(canReadAiEvaluation(undefined)).toBe(false);
+    expect(canReadAiEvaluation("")).toBe(false);
+    expect(canReadAiEvaluation("OBSERVER")).toBe(false);
+  });
+
+  it("is the same rule as the known bugs document, by construction", () => {
+    // Both delegate to canReadJudgeOnlyFile. If one is ever loosened, it should be a
+    // decision rather than a drift between two copies of the same comparison.
+    for (const role of ["JUDGE", "SUPER_ADMIN", "PARTICIPANT", "", null, undefined]) {
+      expect(canReadAiEvaluation(role)).toBe(canReadKnownBugs(role));
+      expect(canReadAiEvaluation(role)).toBe(canReadJudgeOnlyFile(role));
+    }
   });
 });
