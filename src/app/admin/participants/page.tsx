@@ -8,6 +8,7 @@ import { ParticipantAccessControls } from "@/components/admin/participant-access
 import { RosterFilters } from "@/components/admin/roster-filters";
 import { RowActions } from "@/components/admin/row-actions";
 import { StatusBadge } from "@/components/ui/badge";
+import { SortableHeader } from "@/components/ui/sortable-header";
 import { EmptyRow, TableShell, Td, Th, Thead, Tr } from "@/components/ui/table";
 import { requireRole } from "@/lib/auth";
 import { listParticipants } from "@/lib/roster";
@@ -44,6 +45,8 @@ export default async function ParticipantsPage({
     q: typeof raw.q === "string" ? raw.q : undefined,
     status: typeof raw.status === "string" ? raw.status : undefined,
     location: typeof raw.location === "string" ? raw.location : undefined,
+    sort: typeof raw.sort === "string" ? raw.sort : undefined,
+    dir: typeof raw.dir === "string" ? raw.dir : undefined,
     page: typeof raw.page === "string" ? raw.page : undefined,
   });
 
@@ -77,62 +80,60 @@ export default async function ParticipantsPage({
       />
 
       <PasswordReveal count={rows.filter((r) => r.derivedPassword).length}>
-      <TableShell>
-        <Thead>
-          <Tr>
-            <Th>ID card number</Th>
-            <Th>Full name</Th>
-            <Th>Contact</Th>
-            <Th>Location</Th>
-            <Th>Status</Th>
-            <Th>Password</Th>
-            <Th className="text-right">Actions</Th>
-          </Tr>
-        </Thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <EmptyRow colSpan={7}>
-              No participants match these filters.
-            </EmptyRow>
-          ) : (
-            rows.map((row) => (
-              <Tr key={row.id}>
-                <Td className="font-mono text-xs whitespace-nowrap">{row.idCardNumber}</Td>
-                <Td className="font-medium">{row.fullName}</Td>
-                <Td>
-                  <span className="block text-xs">{row.email}</span>
-                  <span className="text-muted block font-mono text-xs">{row.phone}</span>
-                </Td>
-                <Td className="whitespace-nowrap">
-                  {row.location ? LOCATION_LABELS[row.location] : "—"}
-                </Td>
-                <Td>
-                  <StatusBadge status={row.status} />
-                  {/* An attempt handed back reads as ACTIVE, which on its own hides the
+        <TableShell>
+          <Thead>
+            <Tr>
+              <Th>ID card number</Th>
+              <SortableHeader column="name">Full name</SortableHeader>
+              <Th>Contact</Th>
+              <SortableHeader column="location">Location</SortableHeader>
+              <SortableHeader column="status">Status</SortableHeader>
+              <Th>Password</Th>
+              <Th className="text-right">Actions</Th>
+            </Tr>
+          </Thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <EmptyRow colSpan={7}>No participants match these filters.</EmptyRow>
+            ) : (
+              rows.map((row) => (
+                <Tr key={row.id}>
+                  <Td className="font-mono text-xs whitespace-nowrap">{row.idCardNumber}</Td>
+                  <Td className="font-medium">{row.fullName}</Td>
+                  <Td>
+                    <span className="block text-xs">{row.email}</span>
+                    <span className="text-muted block font-mono text-xs">{row.phone}</span>
+                  </Td>
+                  <Td className="whitespace-nowrap">
+                    {row.location ? LOCATION_LABELS[row.location] : "—"}
+                  </Td>
+                  <Td>
+                    <StatusBadge status={row.status} />
+                    {/* An attempt handed back reads as ACTIVE, which on its own hides the
                       fact that a submission is currently withheld from judging. */}
-                  {row.attempt?.reopenedAt && (
-                    <span className="text-warning-strong mt-1 block text-[11px]">
-                      Reopened — awaiting resubmission
-                    </span>
-                  )}
-                </Td>
-                <Td>
-                  <PasswordCell value={row.derivedPassword ?? null} />
-                </Td>
-                <Td>
-                  <RowActions
-                    userId={row.id}
-                    fullName={row.fullName}
-                    status={row.status}
-                    kind="participant"
-                    attempt={row.attempt}
-                  />
-                </Td>
-              </Tr>
-            ))
-          )}
-        </tbody>
-      </TableShell>
+                    {row.attempt?.reopenedAt && (
+                      <span className="text-warning-strong mt-1 block text-[11px]">
+                        Reopened — awaiting resubmission
+                      </span>
+                    )}
+                  </Td>
+                  <Td>
+                    <PasswordCell value={row.derivedPassword ?? null} />
+                  </Td>
+                  <Td>
+                    <RowActions
+                      userId={row.id}
+                      fullName={row.fullName}
+                      status={row.status}
+                      kind="participant"
+                      attempt={row.attempt}
+                    />
+                  </Td>
+                </Tr>
+              ))
+            )}
+          </tbody>
+        </TableShell>
       </PasswordReveal>
 
       <Pagination page={query.page} pageCount={pageCount} total={total} noun="participants" />

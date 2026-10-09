@@ -21,16 +21,43 @@ export function ParticipantForm() {
   const [state, formAction, pending] = useActionState(signUpParticipant, INITIAL);
 
   // Controlled only where a component needs the value: the radio group and the two
-  // password fields. Everything else stays uncontrolled so the browser keeps what was
-  // typed when a server-side error comes back.
+  // password fields.
+  //
+  // The rest are uncontrolled, and get their value back from the action rather than
+  // from the browser. React resets the form once the action returns, which emptied
+  // every one of them — so a mistyped phone number was costing someone their ID card
+  // number, name and email too. defaultValue is what the reset restores them to.
   const [location, setLocation] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const error = (field: string) => state.errors?.[field];
+  // True once they have picked a city since the last refusal, so the "Please select
+  // your city" message goes the moment they do rather than sitting under a city they
+  // can plainly see is selected.
+  const [locationPicked, setLocationPicked] = useState(false);
+
+  const error = (field: string) =>
+    field === "location" && locationPicked ? undefined : state.errors?.[field];
+
+  /**
+   * Posts the city from React state rather than from the radio's DOM state.
+   *
+   * React resets the form once the action returns, which unchecks every radio in the
+   * DOM. React's own state is unchanged, so nothing re-renders and the `checked` prop
+   * is never re-applied — the card goes on looking selected while the input underneath
+   * is not. The next submission then carried no city at all, and the form said "Please
+   * select your city" to someone staring at a selected city.
+   *
+   * Setting it here cannot drift: what is posted is exactly what the screen shows.
+   */
+  function submit(formData: FormData) {
+    formData.set("location", location);
+    setLocationPicked(false);
+    formAction(formData);
+  }
 
   return (
-    <form action={formAction} className="space-y-5" noValidate>
+    <form action={submit} className="space-y-5" noValidate>
       {state.message && <Alert variant="error">{state.message}</Alert>}
       {state.errors?.form && <Alert variant="error">{state.errors.form}</Alert>}
 
@@ -44,6 +71,7 @@ export function ParticipantForm() {
           <Input
             id={id}
             name="idCardNumber"
+            defaultValue={state.values?.idCardNumber}
             inputMode="numeric"
             autoComplete="off"
             placeholder="42101-1234567-8"
@@ -59,6 +87,7 @@ export function ParticipantForm() {
           <Input
             id={id}
             name="fullName"
+            defaultValue={state.values?.fullName}
             autoComplete="name"
             placeholder="Your full name"
             required={required}
@@ -78,6 +107,7 @@ export function ParticipantForm() {
           <Input
             id={id}
             name="email"
+            defaultValue={state.values?.email}
             type="email"
             autoComplete="email"
             placeholder="you@example.com"
@@ -98,6 +128,7 @@ export function ParticipantForm() {
           <Input
             id={id}
             name="phone"
+            defaultValue={state.values?.phone}
             type="tel"
             autoComplete="tel"
             placeholder="0300-1234567"
@@ -115,7 +146,10 @@ export function ParticipantForm() {
             name="location"
             options={LOCATIONS}
             value={location}
-            onChange={setLocation}
+            onChange={(next) => {
+              setLocation(next);
+              setLocationPicked(true);
+            }}
             required={required}
             describedBy={describedBy}
             invalid={invalid}

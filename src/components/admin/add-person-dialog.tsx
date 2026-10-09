@@ -45,12 +45,17 @@ export function AddPersonDialog({ kind }: { kind: keyof typeof ACTIONS }) {
   const [createdName, setCreatedName] = useState("");
   const [dismissed, setDismissed] = useState(false);
 
+  // See the comment on the form's action below: the message has to go the moment a
+  // city is picked, or it sits under a city the admin can plainly see is selected.
+  const [locationPicked, setLocationPicked] = useState(false);
+
   // Derived rather than copied into state by an effect: on success the form dialog
   // gives way to the once-only password, and `dismissed` is what closes that.
   const tempPassword = state.ok && state.tempPassword && !dismissed ? state.tempPassword : null;
   const formOpen = open && tempPassword === null;
 
-  const error = (field: string) => state.errors?.[field];
+  const error = (field: string) =>
+    field === "location" && locationPicked ? undefined : state.errors?.[field];
   const label = LABELS[kind];
 
   return (
@@ -80,6 +85,20 @@ export function AddPersonDialog({ kind }: { kind: keyof typeof ACTIONS }) {
           action={(formData) => {
             setCreatedName(String(formData.get("fullName") ?? ""));
             setDismissed(false); // a new result is about to arrive
+
+            /*
+              The city is posted from React state, not from the radio's DOM state.
+
+              React resets the form once the action returns, which unchecks every radio
+              in the DOM. React's own state is unchanged, so nothing re-renders and the
+              `checked` prop is never re-applied — the card goes on looking selected
+              while the input underneath is not. The next submission then carried no
+              city, and the dialog said "Please select your city" to an admin staring at
+              a selected city.
+            */
+            if (kind === "participant") formData.set("location", location);
+            setLocationPicked(false);
+
             formAction(formData);
           }}
           className="space-y-4"
@@ -99,6 +118,7 @@ export function AddPersonDialog({ kind }: { kind: keyof typeof ACTIONS }) {
                 <Input
                   id={id}
                   name="idCardNumber"
+                  defaultValue={state.values?.idCardNumber}
                   inputMode="numeric"
                   placeholder="42101-1234567-8"
                   required={required}
@@ -114,6 +134,7 @@ export function AddPersonDialog({ kind }: { kind: keyof typeof ACTIONS }) {
               <Input
                 id={id}
                 name="fullName"
+                defaultValue={state.values?.fullName}
                 placeholder="Their full name"
                 required={required}
                 aria-describedby={describedBy}
@@ -132,6 +153,7 @@ export function AddPersonDialog({ kind }: { kind: keyof typeof ACTIONS }) {
               <Input
                 id={id}
                 name="email"
+                defaultValue={state.values?.email}
                 type="email"
                 placeholder={
                   kind === "participant" ? "them@example.com" : `them${JUDGE_EMAIL_DOMAIN}`
@@ -150,6 +172,7 @@ export function AddPersonDialog({ kind }: { kind: keyof typeof ACTIONS }) {
                   <Input
                     id={id}
                     name="phone"
+                    defaultValue={state.values?.phone}
                     type="tel"
                     placeholder="0300-1234567"
                     required={required}
@@ -166,7 +189,10 @@ export function AddPersonDialog({ kind }: { kind: keyof typeof ACTIONS }) {
                     name="location"
                     options={LOCATIONS}
                     value={location}
-                    onChange={setLocation}
+                    onChange={(next) => {
+                      setLocation(next);
+                      setLocationPicked(true);
+                    }}
                     required={required}
                     describedBy={describedBy}
                     invalid={invalid}

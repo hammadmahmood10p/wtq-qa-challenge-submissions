@@ -77,10 +77,16 @@ export const CHALLENGES: Challenge[] = [
         ],
       },
       {
-        heading: "Using AI",
+        // No longer "AI is fine for tidying up what you wrote". The organisers have
+        // closed that door: Challenge 1 measures unaided manual testing, and an
+        // allowance for rewording is impossible to tell apart from an allowance for
+        // writing. Stated here in the one place both the briefing page and the
+        // submission page read from, so the rule cannot say two different things.
+        heading: "AI is not allowed in this challenge",
         items: [
-          "You may use AI to format a bug report or reword what you have already written.",
-          "You may not use AI to find bugs or to write your test cases. That is the part we are assessing.",
+          "Challenge 1 must be entirely your own work. Do not use AI for any part of it — not to find bugs, not to write or format a bug report, and not to draft or reword a test case.",
+          "This is the challenge that measures your own testing, which is why copying and pasting are switched off in the submission fields.",
+          "Challenges 2, 3 and 4 are where AI belongs, and there you are encouraged to use it.",
         ],
       },
     ],
