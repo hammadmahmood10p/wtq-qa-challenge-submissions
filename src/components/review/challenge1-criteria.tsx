@@ -1,4 +1,4 @@
-import { Bug, ClipboardCheck, FlaskConical } from "lucide-react";
+import { Bug, ClipboardCheck, ExternalLink, FlaskConical, ListChecks } from "lucide-react";
 
 /**
  * What a complete finding looks like, stated on the page where it is being judged.
@@ -17,13 +17,34 @@ const BUG_REPORT = ["Title", "Steps to reproduce", "Actual result", "Expected re
 
 const TEST_CASE = ["Title", "Steps to execute", "Expected result"];
 
-export function Challenge1Criteria() {
+export function Challenge1Criteria({ knownBugs }: { knownBugs: boolean }) {
   return (
     <section className="border-violet/30 bg-violet/5 rounded-(--radius-card) border p-5">
-      <h3 className="font-display flex items-center gap-2 text-sm font-semibold">
-        <ClipboardCheck size={15} className="text-violet shrink-0" />
-        What to look for in each finding
-      </h3>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h3 className="font-display flex items-center gap-2 text-sm font-semibold">
+          <ClipboardCheck size={15} className="text-violet shrink-0" />
+          What to look for in each finding
+        </h3>
+
+        {/* The organisers' list of what was broken on purpose. Shown only when one has
+            been uploaded, so the button is never an offer that leads to a 404.
+
+            A new tab rather than a dialog: a judge reads this alongside the findings,
+            switching back and forth, and a modal would close every time they wanted to
+            look at the submission underneath it. */}
+        {knownBugs && (
+          <a
+            href="/api/files/known-bugs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="border-border bg-surface hover:border-violet/50 inline-flex shrink-0 items-center gap-2 rounded-(--radius-control) border px-3.5 py-2 text-xs font-medium transition-colors"
+          >
+            <ListChecks size={14} className="text-violet shrink-0" />
+            View Known Bugs
+            <ExternalLink size={12} className="text-muted shrink-0" />
+          </a>
+        )}
+      </div>
 
       <p className="text-muted mt-1.5 text-xs">
         Every finding below should pair one bug report with the test case that covers it. These are
