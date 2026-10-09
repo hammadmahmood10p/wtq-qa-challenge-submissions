@@ -40,7 +40,6 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Frame-Options", value: "DENY" },
-          { key: "Content-Security-Policy", value: CSP },
           // Nothing here needs a camera, a microphone or a location, so nothing here
           // may ask. Cheap, and it closes the question before anyone raises it.
           {
@@ -48,6 +47,25 @@ const nextConfig: NextConfig = {
             value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
           },
         ],
+      },
+      {
+        /**
+         * The Content-Security-Policy, everywhere except the file-serving route.
+         *
+         * That route hands back uploaded files, one kind of which is a web page — the
+         * AI evaluation report. Such a page has to be served sandboxed, in an opaque
+         * origin, or a script inside it would run on our own host with a judge's
+         * session behind it. The route sets that policy per response, because only it
+         * knows what kind of file is going out.
+         *
+         * A header set here would silently replace the one the route sets, which is
+         * exactly what happened the first time: the sandbox never reached the browser
+         * and the response carried the ordinary site policy, which permits inline
+         * script. So the policy is withheld from that one path and supplied there
+         * instead. Every other header above still applies to it.
+         */
+        source: "/((?!api/files/local).*)",
+        headers: [{ key: "Content-Security-Policy", value: CSP }],
       },
     ];
   },

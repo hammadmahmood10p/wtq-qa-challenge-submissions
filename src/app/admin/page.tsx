@@ -5,7 +5,12 @@ import { EventConfig } from "@/components/admin/event-config";
 import { MasterPasswordCard } from "@/components/admin/master-password-card";
 import { Alert } from "@/components/ui/alert";
 import { requireRole } from "@/lib/auth";
-import { getApplicationUrl, getChallenge4Csv, getKnownBugsPdf } from "@/lib/event-config";
+import {
+  getAiEvaluationReports,
+  getApplicationUrl,
+  getChallenge4Csv,
+  getKnownBugsPdf,
+} from "@/lib/event-config";
 import { masterPasswordState } from "@/lib/master-password";
 import { rosterCounts } from "@/lib/roster";
 
@@ -13,11 +18,12 @@ export const metadata: Metadata = { title: "Super Admin — WTQ 2026" };
 
 export default async function AdminHome() {
   const user = await requireRole("SUPER_ADMIN");
-  const [counts, applicationUrl, csv, knownBugs, masterPassword] = await Promise.all([
+  const [counts, applicationUrl, csv, knownBugs, aiEvaluation, masterPassword] = await Promise.all([
     rosterCounts(),
     getApplicationUrl(),
     getChallenge4Csv(),
     getKnownBugsPdf(),
+    getAiEvaluationReports(),
     masterPasswordState(),
   ]);
 
@@ -55,7 +61,12 @@ export default async function AdminHome() {
         </Alert>
       )}
 
-      <EventConfig applicationUrl={applicationUrl} csv={csv} knownBugs={knownBugs} />
+      <EventConfig
+        applicationUrl={applicationUrl}
+        csv={csv}
+        knownBugs={knownBugs}
+        aiEvaluation={aiEvaluation}
+      />
 
       <MasterPasswordCard state={masterPassword} />
 
