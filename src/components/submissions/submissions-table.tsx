@@ -5,7 +5,7 @@ import { canCommentOnSubmission } from "@/lib/evaluation-limits";
 import type { SubmissionRow } from "@/lib/submissions";
 import { AssignmentActions } from "./assignment-actions";
 import { JudgeComment } from "./judge-comment";
-import { SortableHeader } from "./sortable-header";
+import { SortableHeader } from "@/components/ui/sortable-header";
 
 const LOCATION_LABELS: Record<string, string> = {
   KARACHI: "Karachi",

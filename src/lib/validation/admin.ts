@@ -35,19 +35,28 @@ export const adminCreateSuperAdminSchema = z.object({
 });
 
 export const adminCreateJudgeSchema = z.object({
-  email: emailSchema.refine(
-    isJudgeEmail,
-    `Judges must have a ${JUDGE_EMAIL_DOMAIN} email address`,
-  ),
+  email: emailSchema.refine(isJudgeEmail, `Judges must have a ${JUDGE_EMAIL_DOMAIN} email address`),
   fullName: fullNameSchema,
 });
 
-/** Filters for the participant and judge tables. */
+/**
+ * Filters and ordering for the participant and judge tables.
+ *
+ * `sort` covers both tables, so it names every column either of them can be ordered
+ * by; `location` is simply never asked for on the judges table. An unknown value falls
+ * back to the default rather than failing, because a hand-edited URL should show the
+ * roster rather than an error page.
+ */
 export const rosterQuerySchema = z.object({
   q: z.string().trim().max(120).optional(),
-  status: z.enum(["ALL", "ACTIVE", "BLOCKED", "SUBMITTED_LOCKED", "REMOVED", "PENDING_APPROVAL"]).default("ALL"),
-  location: z.enum(["ALL", "KARACHI", "LAHORE", "ISLAMABAD"]).default("ALL"),
-  page: z.coerce.number().int().min(1).default(1),
+  status: z
+    .enum(["ALL", "ACTIVE", "BLOCKED", "SUBMITTED_LOCKED", "REMOVED", "PENDING_APPROVAL"])
+    .catch("ALL")
+    .default("ALL"),
+  location: z.enum(["ALL", "KARACHI", "LAHORE", "ISLAMABAD"]).catch("ALL").default("ALL"),
+  sort: z.enum(["default", "name", "location", "status"]).catch("default").default("default"),
+  dir: z.enum(["asc", "desc"]).catch("asc").default("asc"),
+  page: z.coerce.number().int().min(1).catch(1).default(1),
 });
 
 export type RosterQuery = z.infer<typeof rosterQuerySchema>;

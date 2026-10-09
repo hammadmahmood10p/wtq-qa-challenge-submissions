@@ -9,9 +9,12 @@ import { cn } from "@/lib/utils";
  * A sortable column heading.
  *
  * Requirement 7 asks for sorting on Score; the same component serves the other
- * columns for free. Sorting lives in the URL rather than component state so a judge
- * can bookmark or share a particular view, and so the server does the ordering —
- * sorting one page of 25 rows client-side would be a lie when there are 1000.
+ * columns for free, and now the participant and judge rosters too — which is why it
+ * lives in ui/ rather than beside the submissions table it was written for.
+ *
+ * Sorting lives in the URL rather than component state so a view can be bookmarked or
+ * shared, and so the server does the ordering — sorting one page of 25 rows in the
+ * browser would be a lie when there are a thousand behind it.
  */
 export function SortableHeader({
   column,
@@ -35,7 +38,10 @@ export function SortableHeader({
   function toggle() {
     const next = new URLSearchParams(params.toString());
     next.set("sort", column);
-    next.set("dir", active && activeDir === defaultDirection ? invert(defaultDirection) : defaultDirection);
+    next.set(
+      "dir",
+      active && activeDir === defaultDirection ? invert(defaultDirection) : defaultDirection,
+    );
     next.delete("page");
     router.push(`${pathname}?${next.toString()}`);
   }
@@ -43,7 +49,10 @@ export function SortableHeader({
   const Icon = !active ? ArrowUpDown : activeDir === "asc" ? ArrowUp : ArrowDown;
 
   return (
-    <Th className={className} aria-sort={active ? (activeDir === "asc" ? "ascending" : "descending") : "none"}>
+    <Th
+      className={className}
+      aria-sort={active ? (activeDir === "asc" ? "ascending" : "descending") : "none"}
+    >
       <button
         type="button"
         onClick={toggle}

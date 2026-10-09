@@ -114,6 +114,44 @@ export function participantWhere(query: RosterQuery): Prisma.UserWhereInput {
   return { AND: conditions };
 }
 
+/**
+ * Column ordering for the roster tables.
+ *
+ * Every ordering ends in a tiebreaker that cannot tie. Postgres may return equally
+ * ranked rows in any order it likes, and with 25 rows to a page that is not academic:
+ * two participants in the same city, under a sort by location, could otherwise appear
+ * on page one and again on page three while a third never appeared at all.
+ *
+ * Status sorts by its stored value rather than by the words on screen. They happen to
+ * read sensibly — ACTIVE, BLOCKED, PENDING_APPROVAL, REMOVED, SUBMITTED_LOCKED — and
+ * the alternative is a CASE expression that has to be revisited every time the enum
+ * changes.
+ *
+ * Location is a Postgres enum, so it sorts in declaration order — Karachi, Lahore,
+ * Islamabad — rather than alphabetically. That is the order the three cities appear in
+ * everywhere else in the product: the signup radio cards, the roster filter, the
+ * import template. Sorting them A to Z here would be the one place they came out in a
+ * different order. Making it alphabetical would mean ordering on `location::text`,
+ * which Prisma cannot express and which would cost a raw query.
+ */
+function rosterOrderBy(
+  query: RosterQuery,
+  fallback: Prisma.UserOrderByWithRelationInput[],
+): Prisma.UserOrderByWithRelationInput[] {
+  const dir = query.dir;
+
+  switch (query.sort) {
+    case "name":
+      return [{ fullName: dir }, { id: "asc" }];
+    case "status":
+      return [{ status: dir }, { fullName: "asc" }, { id: "asc" }];
+    case "location":
+      return [{ participantProfile: { location: dir } }, { fullName: "asc" }, { id: "asc" }];
+    default:
+      return [...fallback, { id: "asc" }];
+  }
+}
+
 export async function listParticipants(query: RosterQuery) {
   const where = participantWhere(query);
 
@@ -121,7 +159,7 @@ export async function listParticipants(query: RosterQuery) {
     db.user.count({ where }),
     db.user.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy: rosterOrderBy(query, [{ createdAt: "desc" }]),
       skip: (query.page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       select: {
@@ -216,8 +254,9 @@ export async function listJudges(query: RosterQuery) {
     db.user.count({ where }),
     db.user.findMany({
       where,
-      // Pending approvals first: that is the queue the admin is here to clear.
-      orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+      // Pending approvals first by default: that is the queue the admin is here to
+      // clear. An explicit sort overrides it.
+      orderBy: rosterOrderBy(query, [{ status: "asc" }, { createdAt: "desc" }]),
       skip: (query.page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       select: {

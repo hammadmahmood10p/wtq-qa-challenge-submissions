@@ -53,16 +53,26 @@ export default async function Challenge1Page() {
             dateStyle: "medium",
             timeStyle: "short",
           })}
-          . Your findings are below and are being judged as they stand. If something
-          needs changing, a super admin can reopen Challenge 1 for you.
+          . Your findings are below and are being judged as they stand. If something needs changing,
+          a super admin can reopen Challenge 1 for you.
         </Alert>
       ) : (
-        <Alert variant="info">
-          Write each bug report alongside the test case that covers it. Everything saves
-          automatically. Copying and pasting are turned off in these fields — attach
-          screenshots with the <strong>Attach evidence</strong> button, or by dragging an
-          image onto the strip under each box.
-        </Alert>
+        <>
+          {/* The rule stated where the work happens, not only on the briefing page.
+              A participant reads the brief once and then spends three hours here, so
+              this is the screen that has to carry it. */}
+          <Alert variant="warning" title="AI is not allowed in Challenge 1">
+            This challenge must be entirely your own work. Do not use AI to find bugs, to write or
+            format a bug report, or to draft or reword a test case. That is why copying and pasting
+            are switched off below. Challenges 2, 3 and 4 are where AI belongs.
+          </Alert>
+
+          <Alert variant="info">
+            Write each bug report alongside the test case that covers it. Everything saves
+            automatically. Attach screenshots with the <strong>Attach evidence</strong> button, or
+            by dragging an image onto the strip under each box.
+          </Alert>
+        </>
       )}
 
       <Challenge1Workspace

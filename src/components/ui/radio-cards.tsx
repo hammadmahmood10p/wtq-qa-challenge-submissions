@@ -23,8 +23,18 @@ interface Props {
  * Radio buttons rendered as selectable cards.
  *
  * Still native radios underneath — the input is visually hidden rather than replaced —
- * so keyboard arrow navigation, screen readers and form submission all behave exactly
- * as expected. The card is only presentation.
+ * so keyboard arrow navigation and screen readers behave exactly as expected. The card
+ * is only presentation.
+ *
+ * **Do not rely on these radios to carry the value into a server action.** They are
+ * controlled, and the tick and border are drawn from `value` rather than from the
+ * input's `:checked`. React resets a form once its action returns, which unchecks every
+ * radio in the DOM; React's state has not changed, so nothing re-renders and `checked`
+ * is never re-applied. The group then goes on looking selected while submitting
+ * nothing, which is a convincing impression of a broken validator.
+ *
+ * Both callers set the field on the FormData from their own state instead — see
+ * participant-form.tsx and add-person-dialog.tsx. Any new caller must do the same.
  */
 export function RadioCards({
   name,

@@ -55,15 +55,15 @@ export default async function ChallengeBriefingPage() {
           {/* Capped for line length, not for page width: prose set across the full
               width of a laptop is unreadable, and this page is read in a hurry. */}
           <p className="text-muted mt-3 max-w-2xl">
-            Everything you need to know before you begin. This page stays available
-            throughout — you can open it in a new tab at any point during the challenge.
+            Everything you need to know before you begin. This page stays available throughout — you
+            can open it in a new tab at any point during the challenge.
           </p>
         </header>
 
         {inProgress && (
           <Alert variant="info" title="Your challenge is running">
-            Your clock is already counting down. Everything you have saved is safe —
-            carry on from where you left off.
+            Your clock is already counting down. Everything you have saved is safe — carry on from
+            where you left off.
           </Alert>
         )}
 
@@ -89,20 +89,19 @@ export default async function ChallengeBriefingPage() {
                   <Clock size={15} className="text-violet mt-0.5 shrink-0" />
                   <span>
                     You have{" "}
-                    <strong className="text-text">
-                      {formatDuration(attempt.durationMinutes)}
-                    </strong>{" "}
-                    in total, counted from the moment you begin. The clock runs on our
-                    servers, so closing your laptop or losing your connection does not
-                    pause it.
+                    <strong className="text-text">{formatDuration(attempt.durationMinutes)}</strong>{" "}
+                    in total, counted from the moment you begin. The clock runs on our servers, so
+                    closing your laptop or losing your connection does not pause it.
                   </span>
                 </li>
                 <li className="flex gap-2.5">
                   <FileText size={15} className="text-violet mt-0.5 shrink-0" />
                   <span>
-                    There are four challenges. Challenges 1 and 2 are for everyone;
-                    Challenges 3 and 4 are alternatives, so you choose one of those two.
-                    You can work in any order and move between them as often as you like.
+                    There are four challenges. Challenges 1 and 2 are for everyone; Challenges 3 and
+                    4 are alternatives, so you choose one of those two.{" "}
+                    <strong className="text-text">Challenge 1 comes first</strong> — the others open
+                    once you have locked it, and from then on you can move between them as often as
+                    you like.
                   </span>
                 </li>
                 <li className="flex gap-2.5">
@@ -111,8 +110,8 @@ export default async function ChallengeBriefingPage() {
                     className="bg-violet mt-2 size-1 shrink-0 rounded-full"
                   />
                   <span>
-                    Your work saves as you go. You do not need to finish one challenge
-                    before starting another.
+                    Your work saves as you go. Once Challenge 1 is locked, you do not need to finish
+                    one of the others before starting another.
                   </span>
                 </li>
                 <li className="flex gap-2.5">
@@ -122,8 +121,8 @@ export default async function ChallengeBriefingPage() {
                   />
                   <span>
                     Nothing is handed in until you press{" "}
-                    <strong className="text-text">Submit</strong>. That can only be done
-                    once, and it cannot be undone.
+                    <strong className="text-text">Submit</strong>. That can only be done once, and
+                    it cannot be undone.
                   </span>
                 </li>
               </ul>
@@ -144,8 +143,8 @@ export default async function ChallengeBriefingPage() {
             ) : (
               notStarted && (
                 <Alert variant="warning" title="Application link pending">
-                  The link to the application you will be testing will appear here
-                  before the event begins.
+                  The link to the application you will be testing will appear here before the event
+                  begins.
                 </Alert>
               )
             )}
@@ -170,12 +169,10 @@ export default async function ChallengeBriefingPage() {
             */}
             {inProgress && (
               <section className="border-violet/40 bg-surface shadow-(--shadow-raised) space-y-4 rounded-(--radius-card) border p-6 text-center">
-                <h2 className="font-display text-lg font-semibold">
-                  Carry on where you left off
-                </h2>
+                <h2 className="font-display text-lg font-semibold">Carry on where you left off</h2>
                 <p className="text-muted mx-auto max-w-md text-sm">
-                  Your workspace has everything you had saved. The clock has not
-                  stopped, so go back as soon as you are ready.
+                  Your workspace has everything you had saved. The clock has not stopped, so go back
+                  as soon as you are ready.
                 </p>
                 <Link
                   href="/challenge/run"
@@ -194,8 +191,8 @@ export default async function ChallengeBriefingPage() {
               <section className="border-border bg-surface shadow-(--shadow-raised) space-y-4 rounded-(--radius-card) border p-6 text-center">
                 <h2 className="font-display text-lg font-semibold">Ready?</h2>
                 <p className="text-muted mx-auto max-w-md text-sm">
-                  Your timer starts the moment you press this button, and it cannot be
-                  paused or restarted. Make sure you are settled before you begin.
+                  Your timer starts the moment you press this button, and it cannot be paused or
+                  restarted. Make sure you are settled before you begin.
                 </p>
                 <form action={beginChallenge}>
                   {/* Signature moment 1: the only animated thing on an otherwise

@@ -24,8 +24,8 @@ export function JudgeForm() {
       {state.errors?.form && <Alert variant="error">{state.errors.form}</Alert>}
 
       <Alert variant="info">
-        Judge accounts need super admin approval. You will not be able to log in until
-        yours is approved.
+        Judge accounts need super admin approval. You will not be able to log in until yours is
+        approved.
       </Alert>
 
       <Field
@@ -38,6 +38,7 @@ export function JudgeForm() {
           <Input
             id={id}
             name="email"
+            defaultValue={state.values?.email}
             type="email"
             autoComplete="email"
             placeholder={`you${JUDGE_EMAIL_DOMAIN}`}
@@ -53,6 +54,7 @@ export function JudgeForm() {
           <Input
             id={id}
             name="fullName"
+            defaultValue={state.values?.fullName}
             autoComplete="name"
             placeholder="Your full name"
             required={required}
