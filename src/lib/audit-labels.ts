@@ -14,12 +14,7 @@ import type { AuditAction } from "@/lib/audit";
  */
 
 export type AuditCategory =
-  | "Authentication"
-  | "Accounts"
-  | "Attempts"
-  | "Judging"
-  | "Event settings"
-  | "Security";
+  "Authentication" | "Accounts" | "Attempts" | "Judging" | "Event settings" | "Security";
 
 /** Drives the colour of the row's badge. Severity to a reader, not to the system. */
 export type AuditTone = "neutral" | "info" | "success" | "warning" | "danger";
@@ -52,21 +47,49 @@ const DESCRIPTORS: Record<AuditAction, AuditDescriptor> = {
   },
 
   // --- Accounts -------------------------------------------------------------
-  "participant.signup": { label: "Registered as a participant", category: "Accounts", tone: "neutral" },
+  "participant.signup": {
+    label: "Registered as a participant",
+    category: "Accounts",
+    tone: "neutral",
+  },
   "judge.signup": { label: "Registered as a judge", category: "Accounts", tone: "neutral" },
-  "admin.participant_created": { label: "Created a participant", category: "Accounts", tone: "info" },
+  "admin.participant_created": {
+    label: "Created a participant",
+    category: "Accounts",
+    tone: "info",
+  },
   "admin.super_admin_created": {
     label: "Created another super admin",
     category: "Security",
     tone: "danger",
   },
-  "admin.participant_blocked": { label: "Blocked an account", category: "Accounts", tone: "warning" },
-  "admin.participant_unblocked": { label: "Unblocked an account", category: "Accounts", tone: "success" },
-  "admin.participant_removed": { label: "Removed an account", category: "Accounts", tone: "warning" },
-  "admin.password_reset": { label: "Issued a temporary password", category: "Accounts", tone: "warning" },
+  "admin.participant_blocked": {
+    label: "Blocked an account",
+    category: "Accounts",
+    tone: "warning",
+  },
+  "admin.participant_unblocked": {
+    label: "Unblocked an account",
+    category: "Accounts",
+    tone: "success",
+  },
+  "admin.participant_removed": {
+    label: "Removed an account",
+    category: "Accounts",
+    tone: "warning",
+  },
+  "admin.password_reset": {
+    label: "Issued a temporary password",
+    category: "Accounts",
+    tone: "warning",
+  },
   "admin.judge_approved": { label: "Approved a judge", category: "Accounts", tone: "success" },
   "admin.judge_rejected": { label: "Rejected a judge", category: "Accounts", tone: "warning" },
-  "admin.participants_imported": { label: "Bulk-created participants", category: "Accounts", tone: "info" },
+  "admin.participants_imported": {
+    label: "Bulk-created participants",
+    category: "Accounts",
+    tone: "info",
+  },
   "admin.judges_imported": { label: "Bulk-created judges", category: "Accounts", tone: "info" },
   "admin.participants_bulk_deleted": {
     label: "Permanently deleted participants",
@@ -106,8 +129,16 @@ const DESCRIPTORS: Record<AuditAction, AuditDescriptor> = {
   },
 
   // --- Judging --------------------------------------------------------------
-  "evaluation.assigned": { label: "Took a submission for review", category: "Judging", tone: "neutral" },
-  "evaluation.unassigned": { label: "Unassigned a submission", category: "Judging", tone: "warning" },
+  "evaluation.assigned": {
+    label: "Took a submission for review",
+    category: "Judging",
+    tone: "neutral",
+  },
+  "evaluation.unassigned": {
+    label: "Unassigned a submission",
+    category: "Judging",
+    tone: "warning",
+  },
   "evaluation.reopened": {
     label: "Reopened a finalised score for re-evaluation",
     category: "Judging",
@@ -138,8 +169,16 @@ const DESCRIPTORS: Record<AuditAction, AuditDescriptor> = {
     category: "Event settings",
     tone: "danger",
   },
-  "admin.app_url_set": { label: "Set the application URL", category: "Event settings", tone: "info" },
-  "admin.app_url_cleared": { label: "Cleared the application URL", category: "Event settings", tone: "warning" },
+  "admin.app_url_set": {
+    label: "Set the application URL",
+    category: "Event settings",
+    tone: "info",
+  },
+  "admin.app_url_cleared": {
+    label: "Cleared the application URL",
+    category: "Event settings",
+    tone: "warning",
+  },
   "admin.challenge4_csv_uploaded": {
     label: "Uploaded the Challenge 4 CSV",
     category: "Event settings",
@@ -150,9 +189,23 @@ const DESCRIPTORS: Record<AuditAction, AuditDescriptor> = {
     category: "Event settings",
     tone: "warning",
   },
+  "admin.known_bugs_uploaded": {
+    label: "Uploaded the known bugs document",
+    category: "Event settings",
+    tone: "info",
+  },
+  "admin.known_bugs_removed": {
+    label: "Removed the known bugs document",
+    category: "Event settings",
+    tone: "warning",
+  },
 
   // --- Security -------------------------------------------------------------
-  "admin.master_password_set": { label: "Set the master password", category: "Security", tone: "warning" },
+  "admin.master_password_set": {
+    label: "Set the master password",
+    category: "Security",
+    tone: "warning",
+  },
   "admin.master_password_cleared": {
     label: "Deleted the master password",
     category: "Security",

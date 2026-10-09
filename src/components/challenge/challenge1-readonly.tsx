@@ -1,5 +1,6 @@
-import { Bug, FileText, FlaskConical } from "lucide-react";
+import { Bug, FileText, FlaskConical, Info } from "lucide-react";
 import type { Challenge1Entry } from "@/lib/challenge1";
+import { challenge1Signals, signalsFor, type Challenge1Signal } from "@/lib/challenge1-signals";
 
 /**
  * Challenge 1 as a judge sees it.
@@ -21,6 +22,23 @@ export function Challenge1ReadOnly({ entries }: { entries: Challenge1Entry[] }) 
     );
   }
 
+  // Computed once for the whole set rather than per half, so the two halves of a
+  // finding are always read from the same pass over it.
+  const signalsByEntry = new Map<string, Challenge1Signal[]>(
+    entries.map((entry) => [
+      entry.id,
+      challenge1Signals({
+        bugTitle: entry.bugTitle,
+        bugDescription: entry.bugDescription,
+        testTitle: entry.testTitle,
+        testDescription: entry.testDescription,
+        bugEvidenceCount: entry.attachments.filter((a) => a.slot === "BUG").length,
+      }),
+    ]),
+  );
+
+  const flagged = entries.filter((entry) => (signalsByEntry.get(entry.id) ?? []).length > 0).length;
+
   return (
     <section className="space-y-3">
       <div className="flex items-baseline justify-between gap-2">
@@ -29,6 +47,17 @@ export function Challenge1ReadOnly({ entries }: { entries: Challenge1Entry[] }) 
           {entries.length} {entries.length === 1 ? "finding" : "findings"}
         </p>
       </div>
+
+      {/* Said once, at the top. A judge who sees amber labels on half the findings
+          needs to know what they mean and, more importantly, what they do not mean. */}
+      {flagged > 0 && (
+        <p className="text-muted text-xs">
+          <Info size={12} className="mr-1 inline shrink-0 align-[-2px]" />
+          The amber labels mark parts of the rubric that could not be found in the text. They are a
+          prompt to look, not a judgement — the wording is the participant&apos;s and the decision
+          is yours.
+        </p>
+      )}
 
       <ol className="space-y-3">
         {entries.map((entry, index) => (
@@ -47,6 +76,7 @@ export function Challenge1ReadOnly({ entries }: { entries: Challenge1Entry[] }) 
                 title={entry.bugTitle}
                 description={entry.bugDescription}
                 evidence={entry.attachments.filter((a) => a.slot === "BUG")}
+                signals={signalsFor(signalsByEntry.get(entry.id) ?? [], "bug")}
               />
               <Half
                 icon={FlaskConical}
@@ -54,6 +84,7 @@ export function Challenge1ReadOnly({ entries }: { entries: Challenge1Entry[] }) 
                 title={entry.testTitle}
                 description={entry.testDescription}
                 evidence={entry.attachments.filter((a) => a.slot === "TEST")}
+                signals={signalsFor(signalsByEntry.get(entry.id) ?? [], "test")}
                 bordered
               />
             </div>
@@ -70,6 +101,7 @@ function Half({
   title,
   description,
   evidence,
+  signals,
   bordered,
 }: {
   icon: typeof Bug;
@@ -77,6 +109,7 @@ function Half({
   title: string;
   description: string;
   evidence: Challenge1Entry["attachments"];
+  signals: Challenge1Signal[];
   bordered?: boolean;
 }) {
   return (
@@ -98,6 +131,22 @@ function Half({
         </pre>
       ) : (
         <p className="text-muted mt-2.5 text-sm italic">No description given.</p>
+      )}
+
+      {/* What the rubric asks for and this half does not appear to contain. A prompt
+          to look, never a verdict — see src/lib/challenge1-signals.ts. */}
+      {signals.length > 0 && (
+        <ul className="mt-3 flex flex-wrap gap-1.5">
+          {signals.map((flag) => (
+            <li
+              key={flag.key}
+              className="border-warning/40 bg-warning/8 text-warning-strong inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium"
+            >
+              <Info size={11} className="shrink-0" />
+              {flag.label}
+            </li>
+          ))}
+        </ul>
       )}
 
       {evidence.length > 0 && (
