@@ -6,7 +6,9 @@ import type { ChallengeKey } from "@/generated/prisma/enums";
 import { Challenge1ReadOnly } from "@/components/challenge/challenge1-readonly";
 import { Challenge1Criteria } from "@/components/review/challenge1-criteria";
 import { ChallengeBrief } from "@/components/challenge/challenge-brief";
+import { AiEvaluationLink } from "@/components/review/ai-evaluation-link";
 import { WhatToReview } from "@/components/review/what-to-review";
+import { getAiEvaluationReports, getKnownBugsPdf } from "@/lib/event-config";
 import {
   Challenge2ReadOnly,
   Challenge3ReadOnly,
@@ -47,6 +49,19 @@ export default async function ReviewPage({ params }: { params: Promise<{ attempt
 
   const submission = await getSubmissionDetail(attemptId);
   if (!submission) notFound();
+
+  // Only whether one exists. The file itself is fetched through its own route, which
+  // re-checks the role — this page must not become a second place that decides who may
+  // read the answer key.
+  const [knownBugsFile, aiEvaluation] = await Promise.all([
+    getKnownBugsPdf(),
+    getAiEvaluationReports(),
+  ]);
+
+  // Only whether one exists, and for the report which kind it is. The files themselves
+  // are fetched through their own routes, which re-check the role — this page must not
+  // become a second place that decides who may read either of them.
+  const knownBugs = Boolean(knownBugsFile);
 
   const evaluation = submission.evaluation;
   const assignedToMe = evaluation?.judgeId === user.id;
@@ -91,7 +106,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ attempt
     if (challenge.id === "C1") {
       content = (
         <div className="space-y-6">
-          <Challenge1Criteria />
+          <Challenge1Criteria knownBugs={knownBugs} />
           <Challenge1ReadOnly entries={submission.challenge1Entries} />
         </div>
       );
@@ -110,8 +125,17 @@ export default async function ReviewPage({ params }: { params: Promise<{ attempt
         </div>
       );
     } else {
+      // Challenges 2 and 3 — the two that take an uploaded report, and so the two the
+      // automated assessment has anything to say about.
       content = (
         <div className="space-y-8">
+          {aiEvaluation[challenge.id as "C2" | "C3"] && (
+            <AiEvaluationLink
+              challenge={challenge.id as "C2" | "C3"}
+              kind={aiEvaluation[challenge.id as "C2" | "C3"]!.kind}
+            />
+          )}
+
           <Challenge2ReadOnly
             attemptId={submission.id}
             challenge={challenge.id}

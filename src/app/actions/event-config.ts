@@ -5,12 +5,26 @@ import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth";
 import { csvProblemMessage, previewCsv, safeCsvFilename, validateCsv } from "@/lib/csv";
 import {
+  getAiEvaluationReport,
   getApplicationUrl,
   getChallenge4Csv,
+  getKnownBugsPdf,
+  isAiEvaluationChallenge,
   normaliseApplicationUrl,
+  setAiEvaluationReport,
   setApplicationUrl,
   setChallenge4Csv,
+  setKnownBugsPdf,
+  type AiEvaluationChallenge,
 } from "@/lib/event-config";
+import { env } from "@/lib/env";
+import { pdfProblemMessage, safeFilename, validatePdf } from "@/lib/pdf";
+import {
+  reportContentType,
+  reportProblemMessage,
+  safeReportFilename,
+  validateReport,
+} from "@/lib/report-upload";
 import { storage } from "@/lib/storage";
 
 /**
@@ -154,6 +168,221 @@ export async function adminUploadChallenge4Csv(
     ok: true,
     message: `${filename} is now available to participants.`,
     preview: previewCsv(bytes),
+  };
+}
+
+/**
+ * The seeded-defect list, for judges.
+ *
+ * Same upload shape as the CSV, with two differences that matter. It is a PDF, so it
+ * goes through the same validator a participant's report does — which checks the magic
+ * bytes rather than trusting the extension. And nothing participant-facing is
+ * revalidated afterwards, because no participant page mentions it: this document says
+ * what was broken on purpose, and a participant who read it would have nothing left to
+ * test.
+ */
+export async function adminUploadKnownBugsPdf(
+  _prev: EventConfigState,
+  formData: FormData,
+): Promise<EventConfigState> {
+  const admin = await requireRole("SUPER_ADMIN");
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { message: "Choose a PDF file to upload." };
+  }
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+
+  // The same ceiling a participant's report gets. A defect list is prose and a few
+  // screenshots; anything near twenty megabytes is a mistake worth catching.
+  const maxBytes = env.MAX_UPLOAD_MB * 1024 * 1024;
+
+  const problem = validatePdf(bytes, maxBytes);
+  if (problem) return { message: pdfProblemMessage(problem, maxBytes) };
+
+  const filename = safeFilename(file.name);
+  const key = `known-bugs/${crypto.randomUUID()}.pdf`;
+
+  try {
+    await storage().put(key, bytes, "application/pdf");
+  } catch (error) {
+    console.error("[known-bugs:upload]", error);
+    return { message: "Could not store the file. Please try again." };
+  }
+
+  const previous = await getKnownBugsPdf();
+
+  await setKnownBugsPdf({ key, filename, sizeBytes: bytes.length, uploadedAt: new Date() });
+
+  // Best effort, as with the CSV: an orphaned object costs storage, a failed delete
+  // must not look like a failed upload.
+  if (previous?.key) {
+    try {
+      await storage().delete(previous.key);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  await audit({
+    action: "admin.known_bugs_uploaded",
+    actorId: admin.id,
+    actorRole: "SUPER_ADMIN",
+    entityType: "setting",
+    metadata: { filename, sizeBytes: bytes.length, replaced: previous?.filename ?? null },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/review", "layout");
+
+  return { ok: true, message: `${filename} is now available to judges.` };
+}
+
+export async function adminRemoveKnownBugsPdf(): Promise<EventConfigState> {
+  const admin = await requireRole("SUPER_ADMIN");
+
+  const existing = await getKnownBugsPdf();
+  if (!existing) return { ok: true };
+
+  await setKnownBugsPdf(null);
+
+  try {
+    await storage().delete(existing.key);
+  } catch {
+    /* ignore — the setting is what judges read */
+  }
+
+  await audit({
+    action: "admin.known_bugs_removed",
+    actorId: admin.id,
+    actorRole: "SUPER_ADMIN",
+    entityType: "setting",
+    metadata: { filename: existing.filename },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/review", "layout");
+
+  return { ok: true, message: "The known bugs document has been removed." };
+}
+
+/**
+ * The automated assessment of the Challenge 2 and 3 reports.
+ *
+ * Takes a PDF or a web page, because the tool that produces it does one or the other
+ * depending on how it is run, and the organisers should not have to care which. The
+ * kind is decided by reading the bytes rather than by trusting the extension, and
+ * stored, because it decides how the file is served — and a web page is the one of the
+ * two that can run something.
+ */
+export async function adminUploadAiEvaluation(
+  _prev: EventConfigState,
+  formData: FormData,
+): Promise<EventConfigState> {
+  const admin = await requireRole("SUPER_ADMIN");
+
+  // Which challenge's report this is, carried by the form rather than by two
+  // near-identical actions. Validated against the allowed set, because it names the
+  // settings that get written and must not be whatever the request says it is.
+  const challenge = String(formData.get("challenge") ?? "");
+  if (!isAiEvaluationChallenge(challenge)) {
+    return { message: "That is not a challenge an evaluation report can belong to." };
+  }
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { message: "Choose a PDF or HTML file to upload." };
+  }
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const maxBytes = env.MAX_UPLOAD_MB * 1024 * 1024;
+
+  const checked = validateReport(bytes, maxBytes);
+  if ("problem" in checked) return { message: reportProblemMessage(checked.problem, maxBytes) };
+
+  const { kind } = checked;
+  const filename = safeReportFilename(file.name, kind);
+  const key = `ai-evaluation/${challenge.toLowerCase()}/${crypto.randomUUID()}.${kind}`;
+
+  try {
+    await storage().put(key, bytes, reportContentType(kind));
+  } catch (error) {
+    console.error("[ai-evaluation:upload]", error);
+    return { message: "Could not store the file. Please try again." };
+  }
+
+  const previous = await getAiEvaluationReport(challenge);
+
+  await setAiEvaluationReport(challenge, {
+    key,
+    filename,
+    sizeBytes: bytes.length,
+    kind,
+    uploadedAt: new Date(),
+  });
+
+  if (previous?.key) {
+    try {
+      await storage().delete(previous.key);
+    } catch {
+      /* ignore — an orphaned object must not look like a failed upload */
+    }
+  }
+
+  await audit({
+    action: "admin.ai_evaluation_uploaded",
+    actorId: admin.id,
+    actorRole: "SUPER_ADMIN",
+    entityType: "setting",
+    metadata: {
+      challenge,
+      filename,
+      kind,
+      sizeBytes: bytes.length,
+      replaced: previous?.filename ?? null,
+    },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/review", "layout");
+
+  return {
+    ok: true,
+    message: `${filename} is now available to judges on Challenge ${challenge.slice(1)}.`,
+  };
+}
+
+export async function adminRemoveAiEvaluation(
+  challenge: AiEvaluationChallenge,
+): Promise<EventConfigState> {
+  const admin = await requireRole("SUPER_ADMIN");
+
+  const existing = await getAiEvaluationReport(challenge);
+  if (!existing) return { ok: true };
+
+  await setAiEvaluationReport(challenge, null);
+
+  try {
+    await storage().delete(existing.key);
+  } catch {
+    /* ignore — the setting is what judges read */
+  }
+
+  await audit({
+    action: "admin.ai_evaluation_removed",
+    actorId: admin.id,
+    actorRole: "SUPER_ADMIN",
+    entityType: "setting",
+    metadata: { challenge, filename: existing.filename },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/review", "layout");
+
+  return {
+    ok: true,
+    message: `The Challenge ${challenge.slice(1)} evaluation report has been removed.`,
   };
 }
 
