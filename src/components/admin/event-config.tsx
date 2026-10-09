@@ -1,19 +1,29 @@
 "use client";
 
-import { CheckCircle2, ExternalLink, FileSpreadsheet, Globe, Trash2, Upload } from "lucide-react";
+import {
+  Bug as BugIcon,
+  CheckCircle2,
+  ExternalLink,
+  FileSpreadsheet,
+  Globe,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { useActionState, useRef, useState, useTransition } from "react";
 import {
   adminClearApplicationUrl,
   adminRemoveChallenge4Csv,
+  adminRemoveKnownBugsPdf,
   adminSetApplicationUrl,
   adminUploadChallenge4Csv,
+  adminUploadKnownBugsPdf,
   type EventConfigState,
 } from "@/app/actions/event-config";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { inputClasses } from "@/components/ui/field";
-import type { Challenge4Csv } from "@/lib/event-config";
+import type { Challenge4Csv, KnownBugsPdf } from "@/lib/event-config";
 
 /**
  * The two things the organisers hand over late, editable while the event is running.
@@ -26,23 +36,26 @@ import type { Challenge4Csv } from "@/lib/event-config";
 export function EventConfig({
   applicationUrl,
   csv,
+  knownBugs,
 }: {
   applicationUrl: string | null;
   csv: Challenge4Csv | null;
+  knownBugs: KnownBugsPdf | null;
 }) {
   return (
     <section className="space-y-3">
       <div>
         <h2 className="font-display text-lg font-semibold">Event configuration</h2>
         <p className="text-muted mt-1 text-sm">
-          Both take effect immediately — participants see the change on their next page
-          load, with no restart.
+          Both take effect immediately — participants see the change on their next page load, with
+          no restart.
         </p>
       </div>
 
       <div className="grid gap-3 xl:grid-cols-2">
         <ApplicationUrlCard applicationUrl={applicationUrl} />
         <CsvCard csv={csv} />
+        <KnownBugsCard pdf={knownBugs} />
       </div>
     </section>
   );
@@ -107,8 +120,8 @@ function ApplicationUrlCard({ applicationUrl }: { applicationUrl: string | null 
       ready={Boolean(applicationUrl)}
     >
       <p className="text-muted text-xs">
-        The e-commerce site participants open for Challenges 1 and 2. Shown on the
-        briefing and on both challenge pages.
+        The e-commerce site participants open for Challenges 1 and 2. Shown on the briefing and on
+        both challenge pages.
       </p>
 
       <div className="space-y-1.5">
@@ -125,8 +138,7 @@ function ApplicationUrlCard({ applicationUrl }: { applicationUrl: string | null 
           className={inputClasses()}
         />
         <p className="text-muted text-xs">
-          A bare address such as <code>shop.example.com</code> is fine — https is
-          assumed.
+          A bare address such as <code>shop.example.com</code> is fine — https is assumed.
         </p>
       </div>
 
@@ -145,9 +157,7 @@ function ApplicationUrlCard({ applicationUrl }: { applicationUrl: string | null 
         </p>
       )}
 
-      {state?.message && (
-        <Alert variant={state.ok ? "success" : "error"}>{state.message}</Alert>
-      )}
+      {state?.message && <Alert variant={state.ok ? "success" : "error"}>{state.message}</Alert>}
 
       <div className="flex flex-wrap justify-end gap-2">
         {applicationUrl && (
@@ -173,12 +183,16 @@ function ApplicationUrlCard({ applicationUrl }: { applicationUrl: string | null 
       >
         <div className="space-y-4">
           <p className="text-muted text-sm">
-            Participants will see &ldquo;Application link pending&rdquo; instead, on the
-            briefing and on Challenges 1 and 2. Anyone part-way through keeps whatever
-            they have already saved.
+            Participants will see &ldquo;Application link pending&rdquo; instead, on the briefing
+            and on Challenges 1 and 2. Anyone part-way through keeps whatever they have already
+            saved.
           </p>
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setConfirmingClear(false)} disabled={pending}>
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmingClear(false)}
+              disabled={pending}
+            >
               Cancel
             </Button>
             <Button variant="danger" onClick={clear} loading={pending}>
@@ -220,9 +234,8 @@ function CsvCard({ csv }: { csv: Challenge4Csv | null }) {
       ready={Boolean(csv)}
     >
       <p className="text-muted text-xs">
-        The test-case file participants download for Challenge 4. Replacing it takes
-        effect at once — anyone who already downloaded the old one will need to fetch it
-        again.
+        The test-case file participants download for Challenge 4. Replacing it takes effect at once
+        — anyone who already downloaded the old one will need to fetch it again.
       </p>
 
       {csv && (
@@ -304,16 +317,151 @@ function CsvCard({ csv }: { csv: Challenge4Csv | null }) {
       >
         <div className="space-y-4">
           <p className="text-muted text-sm">
-            Participants on the Challenge 4 route will see &ldquo;CSV pending&rdquo;
-            instead, and the file will be deleted from storage. Anything they have
-            already submitted is unaffected.
+            Participants on the Challenge 4 route will see &ldquo;CSV pending&rdquo; instead, and
+            the file will be deleted from storage. Anything they have already submitted is
+            unaffected.
           </p>
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setConfirmingRemove(false)} disabled={removing}>
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmingRemove(false)}
+              disabled={removing}
+            >
               Cancel
             </Button>
             <Button variant="danger" onClick={remove} loading={removing}>
               Remove CSV
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+    </Card>
+  );
+}
+
+/**
+ * The seeded-defect list, uploaded here and read by judges.
+ *
+ * Deliberately in the same place as the other two, because an administrator setting up
+ * the event sets up all three in one sitting. The card says plainly who can see it —
+ * that is the question somebody will ask, and the answer being wrong would undo
+ * Challenge 1 entirely.
+ */
+function KnownBugsCard({ pdf }: { pdf: KnownBugsPdf | null }) {
+  const [state, formAction, uploading] = useActionState(adminUploadKnownBugsPdf, {});
+  const [removing, startRemoving] = useTransition();
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [removeState, setRemoveState] = useState<EventConfigState | null>(null);
+
+  function remove() {
+    startRemoving(async () => {
+      setRemoveState(await adminRemoveKnownBugsPdf());
+      setConfirmingRemove(false);
+    });
+  }
+
+  const notice = state.message ? state : removeState;
+
+  return (
+    <Card
+      icon={<BugIcon size={15} className="text-violet" />}
+      title="Known bugs for judges"
+      ready={Boolean(pdf)}
+    >
+      <p className="text-muted text-xs">
+        The defects deliberately seeded into the application under test. Judges open it from the
+        Challenge 1 review page to check a finding against the list.
+      </p>
+
+      <Alert variant="warning">
+        <span className="text-xs">
+          Judges and super admins only. Participants cannot reach this file, by role rather than by
+          not being shown a link.
+        </span>
+      </Alert>
+
+      {pdf && (
+        <div className="border-border bg-surface-raised rounded-(--radius-control) border p-3">
+          <p className="truncate font-mono text-xs font-medium">{pdf.filename}</p>
+          <p className="text-muted mt-1 text-xs">
+            {formatBytes(pdf.sizeBytes)}
+            {pdf.uploadedAt
+              ? ` · uploaded ${pdf.uploadedAt.toLocaleString("en-GB", {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}`
+              : ""}
+          </p>
+          <a
+            href="/api/files/known-bugs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-violet mt-2 inline-block text-xs font-medium hover:underline"
+          >
+            Open what judges see
+          </a>
+        </div>
+      )}
+
+      <form action={formAction} className="space-y-2">
+        <label htmlFor="known-bugs-file" className="block text-sm font-medium">
+          {pdf ? "Replace with" : "Choose a file"}
+        </label>
+        <input
+          id="known-bugs-file"
+          name="file"
+          type="file"
+          accept="application/pdf,.pdf"
+          required
+          className="text-muted file:border-border file:bg-surface-raised file:text-text hover:file:border-violet/40 block w-full text-xs file:mr-3 file:cursor-pointer file:rounded-(--radius-control) file:border file:px-3 file:py-1.5 file:text-xs file:font-medium"
+        />
+
+        {notice?.message && (
+          <Alert variant={notice.ok ? "success" : "error"}>{notice.message}</Alert>
+        )}
+
+        <div className="flex flex-wrap justify-end gap-2">
+          {pdf && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmingRemove(true)}
+              disabled={uploading || removing}
+              className="hover:text-danger-strong"
+            >
+              <Trash2 size={14} />
+              Remove
+            </Button>
+          )}
+          <Button type="submit" size="sm" loading={uploading}>
+            <Upload size={14} />
+            {pdf ? "Replace PDF" : "Upload PDF"}
+          </Button>
+        </div>
+      </form>
+
+      <Dialog
+        open={confirmingRemove}
+        onClose={() => setConfirmingRemove(false)}
+        title="Remove the known bugs document?"
+      >
+        <div className="space-y-4">
+          <p className="text-muted text-sm">
+            Judges will no longer see the &ldquo;View Known Bugs&rdquo; button on the Challenge 1
+            review page, and the file will be deleted from storage. Scores already given are
+            unaffected.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmingRemove(false)}
+              disabled={removing}
+            >
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={remove} loading={removing}>
+              Remove PDF
             </Button>
           </div>
         </div>

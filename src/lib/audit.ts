@@ -47,6 +47,8 @@ export type AuditAction =
   | "admin.app_url_cleared"
   | "admin.challenge4_csv_uploaded"
   | "admin.challenge4_csv_removed"
+  | "admin.known_bugs_uploaded"
+  | "admin.known_bugs_removed"
   | "attempt.started"
   | "attempt.track_chosen"
   | "challenge1.locked"

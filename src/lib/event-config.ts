@@ -24,6 +24,11 @@ export const CSV_FILENAME = "challenge4_csv_filename";
 export const CSV_SIZE = "challenge4_csv_size";
 export const CSV_UPLOADED_AT = "challenge4_csv_uploaded_at";
 
+export const KNOWN_BUGS_KEY = "known_bugs_pdf_key";
+export const KNOWN_BUGS_FILENAME = "known_bugs_pdf_filename";
+export const KNOWN_BUGS_SIZE = "known_bugs_pdf_size";
+export const KNOWN_BUGS_UPLOADED_AT = "known_bugs_pdf_uploaded_at";
+
 /** The address participants open to do Challenge 1 and 2. Null until it is set. */
 export const getApplicationUrl = cache(async (): Promise<string | null> => {
   const value = await getSetting(APP_UNDER_TEST_URL);
@@ -82,6 +87,79 @@ export async function setChallenge4Csv(csv: Challenge4Csv | null): Promise<void>
     setSetting(CSV_FILENAME, csv.filename),
     setSetting(CSV_SIZE, String(csv.sizeBytes)),
     setSetting(CSV_UPLOADED_AT, (csv.uploadedAt ?? new Date()).toISOString()),
+  ]);
+}
+
+export interface KnownBugsPdf {
+  key: string;
+  filename: string;
+  sizeBytes: number;
+  uploadedAt: Date | null;
+}
+
+/**
+ * Who may read the seeded-defect list.
+ *
+ * A named function rather than an inline comparison because it is the rule that keeps
+ * Challenge 1 meaningful. A participant who reads this document has nothing left to
+ * find, and the check guarding it should be something that can be stated, tested, and
+ * pointed at — not two `!==` in the middle of a route handler.
+ *
+ * Note that this is not "any signed-in user", which is what the Challenge 4 CSV uses.
+ * That file is for participants; this one is the answer key.
+ */
+export function canReadKnownBugs(role: string | null | undefined): boolean {
+  return role === "JUDGE" || role === "SUPER_ADMIN";
+}
+
+/**
+ * The defect list the organisers seeded into the application under test.
+ *
+ * Same shape as the CSV above, and deliberately not the same audience. This document
+ * is the answer key: it says what was broken on purpose, which is exactly what a
+ * participant must not know while they are testing. It is served to judges and super
+ * admins only, and the route enforces that rather than trusting the absence of a link.
+ *
+ * Kept out of the repository for the same reason. A file in `deploy/` or `docs/` is a
+ * file in everyone's clone, and the people who most want to read it are the ones with
+ * the most reason to go looking.
+ */
+export const getKnownBugsPdf = cache(async (): Promise<KnownBugsPdf | null> => {
+  const [key, filename, size, uploadedAt] = await Promise.all([
+    getSetting(KNOWN_BUGS_KEY),
+    getSetting(KNOWN_BUGS_FILENAME),
+    getSetting(KNOWN_BUGS_SIZE),
+    getSetting(KNOWN_BUGS_UPLOADED_AT),
+  ]);
+
+  if (!key?.trim()) return null;
+
+  const parsedDate = uploadedAt ? new Date(uploadedAt) : null;
+
+  return {
+    key: key.trim(),
+    filename: filename?.trim() || "known-bugs.pdf",
+    sizeBytes: Number(size) || 0,
+    uploadedAt: parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : null,
+  };
+});
+
+export async function setKnownBugsPdf(pdf: KnownBugsPdf | null): Promise<void> {
+  if (!pdf) {
+    await Promise.all([
+      setSetting(KNOWN_BUGS_KEY, ""),
+      setSetting(KNOWN_BUGS_FILENAME, ""),
+      setSetting(KNOWN_BUGS_SIZE, ""),
+      setSetting(KNOWN_BUGS_UPLOADED_AT, ""),
+    ]);
+    return;
+  }
+
+  await Promise.all([
+    setSetting(KNOWN_BUGS_KEY, pdf.key),
+    setSetting(KNOWN_BUGS_FILENAME, pdf.filename),
+    setSetting(KNOWN_BUGS_SIZE, String(pdf.sizeBytes)),
+    setSetting(KNOWN_BUGS_UPLOADED_AT, (pdf.uploadedAt ?? new Date()).toISOString()),
   ]);
 }
 

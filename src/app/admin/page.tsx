@@ -5,7 +5,7 @@ import { EventConfig } from "@/components/admin/event-config";
 import { MasterPasswordCard } from "@/components/admin/master-password-card";
 import { Alert } from "@/components/ui/alert";
 import { requireRole } from "@/lib/auth";
-import { getApplicationUrl, getChallenge4Csv } from "@/lib/event-config";
+import { getApplicationUrl, getChallenge4Csv, getKnownBugsPdf } from "@/lib/event-config";
 import { masterPasswordState } from "@/lib/master-password";
 import { rosterCounts } from "@/lib/roster";
 
@@ -13,17 +13,26 @@ export const metadata: Metadata = { title: "Super Admin — WTQ 2026" };
 
 export default async function AdminHome() {
   const user = await requireRole("SUPER_ADMIN");
-  const [counts, applicationUrl, csv, masterPassword] = await Promise.all([
+  const [counts, applicationUrl, csv, knownBugs, masterPassword] = await Promise.all([
     rosterCounts(),
     getApplicationUrl(),
     getChallenge4Csv(),
+    getKnownBugsPdf(),
     masterPasswordState(),
   ]);
 
   const tiles = [
     { label: "Participants registered", value: counts.participants, href: "/admin/participants" },
-    { label: "Participants blocked", value: counts.participantsBlocked, href: "/admin/participants?status=BLOCKED" },
-    { label: "Judges awaiting approval", value: counts.judgesPending, href: "/admin/judges?status=PENDING_APPROVAL" },
+    {
+      label: "Participants blocked",
+      value: counts.participantsBlocked,
+      href: "/admin/participants?status=BLOCKED",
+    },
+    {
+      label: "Judges awaiting approval",
+      value: counts.judgesPending,
+      href: "/admin/judges?status=PENDING_APPROVAL",
+    },
     { label: "Judges approved", value: counts.judgesActive, href: "/admin/judges?status=ACTIVE" },
   ];
 
@@ -35,7 +44,10 @@ export default async function AdminHome() {
       </div>
 
       {counts.judgesPending > 0 && (
-        <Alert variant="warning" title={`${counts.judgesPending} judge account(s) awaiting approval`}>
+        <Alert
+          variant="warning"
+          title={`${counts.judgesPending} judge account(s) awaiting approval`}
+        >
           <Link href="/admin/judges?status=PENDING_APPROVAL" className="underline">
             Review them now
           </Link>{" "}
@@ -43,7 +55,7 @@ export default async function AdminHome() {
         </Alert>
       )}
 
-      <EventConfig applicationUrl={applicationUrl} csv={csv} />
+      <EventConfig applicationUrl={applicationUrl} csv={csv} knownBugs={knownBugs} />
 
       <MasterPasswordCard state={masterPassword} />
 
@@ -62,8 +74,18 @@ export default async function AdminHome() {
 
       <div className="grid gap-3 sm:grid-cols-2">
         {[
-          { href: "/admin/participants", icon: Users, title: "Manage Participants", body: "Add, block, remove or reset a participant's password." },
-          { href: "/admin/judges", icon: Gavel, title: "Manage Judges", body: "Approve accounts, add judges, block or remove them." },
+          {
+            href: "/admin/participants",
+            icon: Users,
+            title: "Manage Participants",
+            body: "Add, block, remove or reset a participant's password.",
+          },
+          {
+            href: "/admin/judges",
+            icon: Gavel,
+            title: "Manage Judges",
+            body: "Approve accounts, add judges, block or remove them.",
+          },
         ].map(({ href, icon: Icon, title, body }) => (
           <Link
             key={href}
@@ -76,14 +98,16 @@ export default async function AdminHome() {
             <div className="min-w-0">
               <p className="font-display flex items-center gap-2 font-semibold">
                 {title}
-                <ArrowRight size={15} className="text-muted transition-transform duration-(--duration-standard) group-hover:translate-x-1" />
+                <ArrowRight
+                  size={15}
+                  className="text-muted transition-transform duration-(--duration-standard) group-hover:translate-x-1"
+                />
               </p>
               <p className="text-muted mt-1 text-sm">{body}</p>
             </div>
           </Link>
         ))}
       </div>
-
     </div>
   );
 }

@@ -7,10 +7,14 @@ import { csvProblemMessage, previewCsv, safeCsvFilename, validateCsv } from "@/l
 import {
   getApplicationUrl,
   getChallenge4Csv,
+  getKnownBugsPdf,
   normaliseApplicationUrl,
   setApplicationUrl,
   setChallenge4Csv,
+  setKnownBugsPdf,
 } from "@/lib/event-config";
+import { env } from "@/lib/env";
+import { pdfProblemMessage, safeFilename, validatePdf } from "@/lib/pdf";
 import { storage } from "@/lib/storage";
 
 /**
@@ -155,6 +159,102 @@ export async function adminUploadChallenge4Csv(
     message: `${filename} is now available to participants.`,
     preview: previewCsv(bytes),
   };
+}
+
+/**
+ * The seeded-defect list, for judges.
+ *
+ * Same upload shape as the CSV, with two differences that matter. It is a PDF, so it
+ * goes through the same validator a participant's report does — which checks the magic
+ * bytes rather than trusting the extension. And nothing participant-facing is
+ * revalidated afterwards, because no participant page mentions it: this document says
+ * what was broken on purpose, and a participant who read it would have nothing left to
+ * test.
+ */
+export async function adminUploadKnownBugsPdf(
+  _prev: EventConfigState,
+  formData: FormData,
+): Promise<EventConfigState> {
+  const admin = await requireRole("SUPER_ADMIN");
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { message: "Choose a PDF file to upload." };
+  }
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+
+  // The same ceiling a participant's report gets. A defect list is prose and a few
+  // screenshots; anything near twenty megabytes is a mistake worth catching.
+  const maxBytes = env.MAX_UPLOAD_MB * 1024 * 1024;
+
+  const problem = validatePdf(bytes, maxBytes);
+  if (problem) return { message: pdfProblemMessage(problem, maxBytes) };
+
+  const filename = safeFilename(file.name);
+  const key = `known-bugs/${crypto.randomUUID()}.pdf`;
+
+  try {
+    await storage().put(key, bytes, "application/pdf");
+  } catch (error) {
+    console.error("[known-bugs:upload]", error);
+    return { message: "Could not store the file. Please try again." };
+  }
+
+  const previous = await getKnownBugsPdf();
+
+  await setKnownBugsPdf({ key, filename, sizeBytes: bytes.length, uploadedAt: new Date() });
+
+  // Best effort, as with the CSV: an orphaned object costs storage, a failed delete
+  // must not look like a failed upload.
+  if (previous?.key) {
+    try {
+      await storage().delete(previous.key);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  await audit({
+    action: "admin.known_bugs_uploaded",
+    actorId: admin.id,
+    actorRole: "SUPER_ADMIN",
+    entityType: "setting",
+    metadata: { filename, sizeBytes: bytes.length, replaced: previous?.filename ?? null },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/review", "layout");
+
+  return { ok: true, message: `${filename} is now available to judges.` };
+}
+
+export async function adminRemoveKnownBugsPdf(): Promise<EventConfigState> {
+  const admin = await requireRole("SUPER_ADMIN");
+
+  const existing = await getKnownBugsPdf();
+  if (!existing) return { ok: true };
+
+  await setKnownBugsPdf(null);
+
+  try {
+    await storage().delete(existing.key);
+  } catch {
+    /* ignore — the setting is what judges read */
+  }
+
+  await audit({
+    action: "admin.known_bugs_removed",
+    actorId: admin.id,
+    actorRole: "SUPER_ADMIN",
+    entityType: "setting",
+    metadata: { filename: existing.filename },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/review", "layout");
+
+  return { ok: true, message: "The known bugs document has been removed." };
 }
 
 export async function adminRemoveChallenge4Csv(): Promise<EventConfigState> {

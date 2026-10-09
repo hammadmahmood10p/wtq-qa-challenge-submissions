@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normaliseApplicationUrl } from "./event-config";
+import { canReadKnownBugs, normaliseApplicationUrl } from "./event-config";
 
 describe("normaliseApplicationUrl", () => {
   it("keeps a full https address", () => {
@@ -44,5 +44,37 @@ describe("normaliseApplicationUrl", () => {
     // "shop" would otherwise become https://shop/ and fail only when a participant
     // clicks it.
     expect(normaliseApplicationUrl("shop")).toBeNull();
+  });
+});
+
+/**
+ * The seeded-defect list is the answer key to Challenge 1. If a participant can read
+ * it, the challenge measures transcription rather than testing — so this rule is worth
+ * pinning down rather than trusting to a comparison in a route handler.
+ */
+describe("canReadKnownBugs", () => {
+  it("lets judges read it, which is what it is for", () => {
+    expect(canReadKnownBugs("JUDGE")).toBe(true);
+  });
+
+  it("lets a super admin read it", () => {
+    expect(canReadKnownBugs("SUPER_ADMIN")).toBe(true);
+  });
+
+  it("never lets a participant read it", () => {
+    expect(canReadKnownBugs("PARTICIPANT")).toBe(false);
+  });
+
+  it("refuses anyone who is not signed in", () => {
+    expect(canReadKnownBugs(null)).toBe(false);
+    expect(canReadKnownBugs(undefined)).toBe(false);
+  });
+
+  it("refuses a role it does not recognise", () => {
+    // Defensive: a role added later is denied until somebody decides otherwise, which
+    // is the right default for the one document that would spoil the event.
+    expect(canReadKnownBugs("")).toBe(false);
+    expect(canReadKnownBugs("OBSERVER")).toBe(false);
+    expect(canReadKnownBugs("judge")).toBe(false);
   });
 });
