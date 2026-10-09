@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  AI_EVALUATION_CHALLENGES,
   canReadAiEvaluation,
   canReadJudgeOnlyFile,
   canReadKnownBugs,
+  isAiEvaluationChallenge,
   normaliseApplicationUrl,
 } from "./event-config";
 
@@ -109,6 +111,35 @@ describe("canReadAiEvaluation", () => {
     for (const role of ["JUDGE", "SUPER_ADMIN", "PARTICIPANT", "", null, undefined]) {
       expect(canReadAiEvaluation(role)).toBe(canReadKnownBugs(role));
       expect(canReadAiEvaluation(role)).toBe(canReadJudgeOnlyFile(role));
+    }
+  });
+});
+
+describe("isAiEvaluationChallenge", () => {
+  it("accepts the two challenges that take an uploaded report", () => {
+    expect(isAiEvaluationChallenge("C2")).toBe(true);
+    expect(isAiEvaluationChallenge("C3")).toBe(true);
+  });
+
+  it("refuses the ones with nothing for the assessment to read", () => {
+    // Challenge 1 is written into the application; Challenge 4 is a repository link.
+    // Neither produces a PDF, so neither has reports to assess.
+    expect(isAiEvaluationChallenge("C1")).toBe(false);
+    expect(isAiEvaluationChallenge("C4")).toBe(false);
+  });
+
+  it("refuses anything that could come off a request", () => {
+    // The value names the settings that get written and the folder a file lands in,
+    // so it must never be whatever the form says it is.
+    expect(isAiEvaluationChallenge("")).toBe(false);
+    expect(isAiEvaluationChallenge("c2")).toBe(false);
+    expect(isAiEvaluationChallenge("../../etc")).toBe(false);
+    expect(isAiEvaluationChallenge("C2; DROP TABLE")).toBe(false);
+  });
+
+  it("agrees with the list the admin screen renders from", () => {
+    for (const challenge of AI_EVALUATION_CHALLENGES) {
+      expect(isAiEvaluationChallenge(challenge)).toBe(true);
     }
   });
 });

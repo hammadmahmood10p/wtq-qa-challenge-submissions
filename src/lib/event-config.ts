@@ -30,11 +30,31 @@ export const KNOWN_BUGS_FILENAME = "known_bugs_pdf_filename";
 export const KNOWN_BUGS_SIZE = "known_bugs_pdf_size";
 export const KNOWN_BUGS_UPLOADED_AT = "known_bugs_pdf_uploaded_at";
 
-export const AI_EVAL_KEY = "ai_evaluation_key";
-export const AI_EVAL_FILENAME = "ai_evaluation_filename";
-export const AI_EVAL_SIZE = "ai_evaluation_size";
-export const AI_EVAL_KIND = "ai_evaluation_kind";
-export const AI_EVAL_UPLOADED_AT = "ai_evaluation_uploaded_at";
+/**
+ * The challenges an evaluation report can belong to.
+ *
+ * The same two the bulk export covers, and for the same reason: they are the two that
+ * take an uploaded report, so they are the two the assessment has anything to read.
+ * Challenge 1 is written into the application and Challenge 4 is a repository link.
+ */
+export const AI_EVALUATION_CHALLENGES = ["C2", "C3"] as const;
+export type AiEvaluationChallenge = (typeof AI_EVALUATION_CHALLENGES)[number];
+
+export function isAiEvaluationChallenge(value: string): value is AiEvaluationChallenge {
+  return (AI_EVALUATION_CHALLENGES as readonly string[]).includes(value);
+}
+
+/** The setting names for one challenge's report. Derived, so the two cannot diverge. */
+function aiEvaluationKeys(challenge: AiEvaluationChallenge) {
+  const prefix = `ai_evaluation_${challenge.toLowerCase()}`;
+  return {
+    key: `${prefix}_key`,
+    filename: `${prefix}_filename`,
+    size: `${prefix}_size`,
+    kind: `${prefix}_kind`,
+    uploadedAt: `${prefix}_uploaded_at`,
+  };
+}
 
 /** The address participants open to do Challenge 1 and 2. Null until it is set. */
 export const getApplicationUrl = cache(async (): Promise<string | null> => {
@@ -207,48 +227,65 @@ export interface AiEvaluationReport {
  * examined once on upload, and re-sniffing on every request would mean the answer
  * could differ between the two.
  */
-export const getAiEvaluationReport = cache(async (): Promise<AiEvaluationReport | null> => {
-  const [key, filename, size, kind, uploadedAt] = await Promise.all([
-    getSetting(AI_EVAL_KEY),
-    getSetting(AI_EVAL_FILENAME),
-    getSetting(AI_EVAL_SIZE),
-    getSetting(AI_EVAL_KIND),
-    getSetting(AI_EVAL_UPLOADED_AT),
-  ]);
+export const getAiEvaluationReport = cache(
+  async (challenge: AiEvaluationChallenge): Promise<AiEvaluationReport | null> => {
+    const names = aiEvaluationKeys(challenge);
 
-  if (!key?.trim()) return null;
+    const [key, filename, size, kind, uploadedAt] = await Promise.all([
+      getSetting(names.key),
+      getSetting(names.filename),
+      getSetting(names.size),
+      getSetting(names.kind),
+      getSetting(names.uploadedAt),
+    ]);
 
-  const parsedDate = uploadedAt ? new Date(uploadedAt) : null;
+    if (!key?.trim()) return null;
 
-  return {
-    key: key.trim(),
-    filename: filename?.trim() || "ai-evaluation.pdf",
-    sizeBytes: Number(size) || 0,
-    // Defaults to pdf: a stored value that is neither must not become "serve this as
-    // a web page", which is the one of the two that can run anything.
-    kind: kind === "html" ? "html" : "pdf",
-    uploadedAt: parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : null,
-  };
-});
+    const parsedDate = uploadedAt ? new Date(uploadedAt) : null;
 
-export async function setAiEvaluationReport(report: AiEvaluationReport | null): Promise<void> {
+    return {
+      key: key.trim(),
+      filename: filename?.trim() || `ai-evaluation-${challenge.toLowerCase()}.pdf`,
+      sizeBytes: Number(size) || 0,
+      // Defaults to pdf: a stored value that is neither must not become "serve this as
+      // a web page", which is the one of the two that can run anything.
+      kind: kind === "html" ? "html" : "pdf",
+      uploadedAt: parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : null,
+    };
+  },
+);
+
+/** Both reports at once, for the screens that show them side by side. */
+export async function getAiEvaluationReports(): Promise<
+  Record<AiEvaluationChallenge, AiEvaluationReport | null>
+> {
+  const [c2, c3] = await Promise.all([getAiEvaluationReport("C2"), getAiEvaluationReport("C3")]);
+  return { C2: c2, C3: c3 };
+}
+
+export async function setAiEvaluationReport(
+  challenge: AiEvaluationChallenge,
+  report: AiEvaluationReport | null,
+): Promise<void> {
+  const names = aiEvaluationKeys(challenge);
+
   if (!report) {
     await Promise.all([
-      setSetting(AI_EVAL_KEY, ""),
-      setSetting(AI_EVAL_FILENAME, ""),
-      setSetting(AI_EVAL_SIZE, ""),
-      setSetting(AI_EVAL_KIND, ""),
-      setSetting(AI_EVAL_UPLOADED_AT, ""),
+      setSetting(names.key, ""),
+      setSetting(names.filename, ""),
+      setSetting(names.size, ""),
+      setSetting(names.kind, ""),
+      setSetting(names.uploadedAt, ""),
     ]);
     return;
   }
 
   await Promise.all([
-    setSetting(AI_EVAL_KEY, report.key),
-    setSetting(AI_EVAL_FILENAME, report.filename),
-    setSetting(AI_EVAL_SIZE, String(report.sizeBytes)),
-    setSetting(AI_EVAL_KIND, report.kind),
-    setSetting(AI_EVAL_UPLOADED_AT, (report.uploadedAt ?? new Date()).toISOString()),
+    setSetting(names.key, report.key),
+    setSetting(names.filename, report.filename),
+    setSetting(names.size, String(report.sizeBytes)),
+    setSetting(names.kind, report.kind),
+    setSetting(names.uploadedAt, (report.uploadedAt ?? new Date()).toISOString()),
   ]);
 }
 

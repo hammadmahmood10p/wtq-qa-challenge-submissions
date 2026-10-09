@@ -9,11 +9,13 @@ import {
   getApplicationUrl,
   getChallenge4Csv,
   getKnownBugsPdf,
+  isAiEvaluationChallenge,
   normaliseApplicationUrl,
   setAiEvaluationReport,
   setApplicationUrl,
   setChallenge4Csv,
   setKnownBugsPdf,
+  type AiEvaluationChallenge,
 } from "@/lib/event-config";
 import { env } from "@/lib/env";
 import { pdfProblemMessage, safeFilename, validatePdf } from "@/lib/pdf";
@@ -280,6 +282,14 @@ export async function adminUploadAiEvaluation(
 ): Promise<EventConfigState> {
   const admin = await requireRole("SUPER_ADMIN");
 
+  // Which challenge's report this is, carried by the form rather than by two
+  // near-identical actions. Validated against the allowed set, because it names the
+  // settings that get written and must not be whatever the request says it is.
+  const challenge = String(formData.get("challenge") ?? "");
+  if (!isAiEvaluationChallenge(challenge)) {
+    return { message: "That is not a challenge an evaluation report can belong to." };
+  }
+
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
     return { message: "Choose a PDF or HTML file to upload." };
@@ -293,7 +303,7 @@ export async function adminUploadAiEvaluation(
 
   const { kind } = checked;
   const filename = safeReportFilename(file.name, kind);
-  const key = `ai-evaluation/${crypto.randomUUID()}.${kind}`;
+  const key = `ai-evaluation/${challenge.toLowerCase()}/${crypto.randomUUID()}.${kind}`;
 
   try {
     await storage().put(key, bytes, reportContentType(kind));
@@ -302,9 +312,9 @@ export async function adminUploadAiEvaluation(
     return { message: "Could not store the file. Please try again." };
   }
 
-  const previous = await getAiEvaluationReport();
+  const previous = await getAiEvaluationReport(challenge);
 
-  await setAiEvaluationReport({
+  await setAiEvaluationReport(challenge, {
     key,
     filename,
     sizeBytes: bytes.length,
@@ -325,7 +335,13 @@ export async function adminUploadAiEvaluation(
     actorId: admin.id,
     actorRole: "SUPER_ADMIN",
     entityType: "setting",
-    metadata: { filename, kind, sizeBytes: bytes.length, replaced: previous?.filename ?? null },
+    metadata: {
+      challenge,
+      filename,
+      kind,
+      sizeBytes: bytes.length,
+      replaced: previous?.filename ?? null,
+    },
   });
 
   revalidatePath("/admin");
@@ -333,17 +349,19 @@ export async function adminUploadAiEvaluation(
 
   return {
     ok: true,
-    message: `${filename} is now available to judges on Challenges 2 and 3.`,
+    message: `${filename} is now available to judges on Challenge ${challenge.slice(1)}.`,
   };
 }
 
-export async function adminRemoveAiEvaluation(): Promise<EventConfigState> {
+export async function adminRemoveAiEvaluation(
+  challenge: AiEvaluationChallenge,
+): Promise<EventConfigState> {
   const admin = await requireRole("SUPER_ADMIN");
 
-  const existing = await getAiEvaluationReport();
+  const existing = await getAiEvaluationReport(challenge);
   if (!existing) return { ok: true };
 
-  await setAiEvaluationReport(null);
+  await setAiEvaluationReport(challenge, null);
 
   try {
     await storage().delete(existing.key);
@@ -356,13 +374,16 @@ export async function adminRemoveAiEvaluation(): Promise<EventConfigState> {
     actorId: admin.id,
     actorRole: "SUPER_ADMIN",
     entityType: "setting",
-    metadata: { filename: existing.filename },
+    metadata: { challenge, filename: existing.filename },
   });
 
   revalidatePath("/admin");
   revalidatePath("/review", "layout");
 
-  return { ok: true, message: "The AI evaluation report has been removed." };
+  return {
+    ok: true,
+    message: `The Challenge ${challenge.slice(1)} evaluation report has been removed.`,
+  };
 }
 
 export async function adminRemoveChallenge4Csv(): Promise<EventConfigState> {

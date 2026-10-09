@@ -26,7 +26,12 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { inputClasses } from "@/components/ui/field";
-import type { AiEvaluationReport, Challenge4Csv, KnownBugsPdf } from "@/lib/event-config";
+import type {
+  AiEvaluationChallenge,
+  AiEvaluationReport,
+  Challenge4Csv,
+  KnownBugsPdf,
+} from "@/lib/event-config";
 
 /**
  * The two things the organisers hand over late, editable while the event is running.
@@ -45,7 +50,7 @@ export function EventConfig({
   applicationUrl: string | null;
   csv: Challenge4Csv | null;
   knownBugs: KnownBugsPdf | null;
-  aiEvaluation: AiEvaluationReport | null;
+  aiEvaluation: Record<AiEvaluationChallenge, AiEvaluationReport | null>;
 }) {
   return (
     <section className="space-y-3">
@@ -61,7 +66,8 @@ export function EventConfig({
         <ApplicationUrlCard applicationUrl={applicationUrl} />
         <CsvCard csv={csv} />
         <KnownBugsCard pdf={knownBugs} />
-        <AiEvaluationCard report={aiEvaluation} />
+        <AiEvaluationCard challenge="C2" report={aiEvaluation.C2} />
+        <AiEvaluationCard challenge="C3" report={aiEvaluation.C3} />
       </div>
     </section>
   );
@@ -484,7 +490,14 @@ function KnownBugsCard({ pdf }: { pdf: KnownBugsPdf | null }) {
  * tell from the filename — the extension is corrected to match the actual contents on
  * upload, so a mislabelled file is quietly fixed rather than quietly trusted.
  */
-function AiEvaluationCard({ report }: { report: AiEvaluationReport | null }) {
+function AiEvaluationCard({
+  challenge,
+  report,
+}: {
+  challenge: AiEvaluationChallenge;
+  report: AiEvaluationReport | null;
+}) {
+  const number = challenge.slice(1);
   const [state, formAction, uploading] = useActionState(adminUploadAiEvaluation, {});
   const [removing, startRemoving] = useTransition();
   const [confirmingRemove, setConfirmingRemove] = useState(false);
@@ -492,7 +505,7 @@ function AiEvaluationCard({ report }: { report: AiEvaluationReport | null }) {
 
   function remove() {
     startRemoving(async () => {
-      setRemoveState(await adminRemoveAiEvaluation());
+      setRemoveState(await adminRemoveAiEvaluation(challenge));
       setConfirmingRemove(false);
     });
   }
@@ -502,12 +515,13 @@ function AiEvaluationCard({ report }: { report: AiEvaluationReport | null }) {
   return (
     <Card
       icon={<Sparkles size={15} className="text-violet" />}
-      title="AI evaluation report"
+      title={`AI evaluation — Challenge ${number}`}
       ready={Boolean(report)}
     >
       <p className="text-muted text-xs">
-        What the automated assessment produced from the exported Challenge 2 and 3 reports. Judges
-        open it from either of those review tabs. A PDF or an HTML file — both are accepted.
+        What the automated assessment produced from the exported Challenge {number} reports. Judges
+        open it from the Challenge {number} review tab, and nowhere else. A PDF or an HTML file —
+        both are accepted.
       </p>
 
       <Alert variant="warning">
@@ -530,7 +544,7 @@ function AiEvaluationCard({ report }: { report: AiEvaluationReport | null }) {
               : ""}
           </p>
           <a
-            href="/api/files/ai-evaluation"
+            href={`/api/files/ai-evaluation/${challenge.toLowerCase()}`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-violet mt-2 inline-block text-xs font-medium hover:underline"
@@ -541,11 +555,15 @@ function AiEvaluationCard({ report }: { report: AiEvaluationReport | null }) {
       )}
 
       <form action={formAction} className="space-y-2">
-        <label htmlFor="ai-eval-file" className="block text-sm font-medium">
+        {/* Which report this is. Read and validated by the action, so one action
+            serves both cards without two near-identical exports. */}
+        <input type="hidden" name="challenge" value={challenge} />
+
+        <label htmlFor={`ai-eval-file-${challenge}`} className="block text-sm font-medium">
           {report ? "Replace with" : "Choose a file"}
         </label>
         <input
-          id="ai-eval-file"
+          id={`ai-eval-file-${challenge}`}
           name="file"
           type="file"
           accept="application/pdf,.pdf,text/html,.html,.htm"
@@ -581,13 +599,13 @@ function AiEvaluationCard({ report }: { report: AiEvaluationReport | null }) {
       <Dialog
         open={confirmingRemove}
         onClose={() => setConfirmingRemove(false)}
-        title="Remove the AI evaluation report?"
+        title={`Remove the Challenge ${number} evaluation report?`}
       >
         <div className="space-y-4">
           <p className="text-muted text-sm">
-            Judges will no longer see the &ldquo;View AI Evaluation&rdquo; button on the Challenge 2
-            and 3 review tabs, and the file will be deleted from storage. Scores already given are
-            unaffected.
+            Judges will no longer see the &ldquo;View AI Evaluation&rdquo; button on the Challenge{" "}
+            {number} review tab, and the file will be deleted from storage. The other
+            challenge&rsquo;s report, and any scores already given, are unaffected.
           </p>
           <div className="flex justify-end gap-2">
             <Button

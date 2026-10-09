@@ -6,7 +6,7 @@ import { MasterPasswordCard } from "@/components/admin/master-password-card";
 import { Alert } from "@/components/ui/alert";
 import { requireRole } from "@/lib/auth";
 import {
-  getAiEvaluationReport,
+  getAiEvaluationReports,
   getApplicationUrl,
   getChallenge4Csv,
   getKnownBugsPdf,
@@ -23,7 +23,7 @@ export default async function AdminHome() {
     getApplicationUrl(),
     getChallenge4Csv(),
     getKnownBugsPdf(),
-    getAiEvaluationReport(),
+    getAiEvaluationReports(),
     masterPasswordState(),
   ]);
 

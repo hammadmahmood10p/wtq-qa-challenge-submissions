@@ -8,7 +8,7 @@ import { Challenge1Criteria } from "@/components/review/challenge1-criteria";
 import { ChallengeBrief } from "@/components/challenge/challenge-brief";
 import { AiEvaluationLink } from "@/components/review/ai-evaluation-link";
 import { WhatToReview } from "@/components/review/what-to-review";
-import { getAiEvaluationReport, getKnownBugsPdf } from "@/lib/event-config";
+import { getAiEvaluationReports, getKnownBugsPdf } from "@/lib/event-config";
 import {
   Challenge2ReadOnly,
   Challenge3ReadOnly,
@@ -55,7 +55,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ attempt
   // read the answer key.
   const [knownBugsFile, aiEvaluation] = await Promise.all([
     getKnownBugsPdf(),
-    getAiEvaluationReport(),
+    getAiEvaluationReports(),
   ]);
 
   // Only whether one exists, and for the report which kind it is. The files themselves
@@ -129,7 +129,12 @@ export default async function ReviewPage({ params }: { params: Promise<{ attempt
       // automated assessment has anything to say about.
       content = (
         <div className="space-y-8">
-          {aiEvaluation && <AiEvaluationLink kind={aiEvaluation.kind} />}
+          {aiEvaluation[challenge.id as "C2" | "C3"] && (
+            <AiEvaluationLink
+              challenge={challenge.id as "C2" | "C3"}
+              kind={aiEvaluation[challenge.id as "C2" | "C3"]!.kind}
+            />
+          )}
 
           <Challenge2ReadOnly
             attemptId={submission.id}
